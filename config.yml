@@ -1,0 +1,4 @@
+path:
+  nginxBin: /opt/homebrew/opt/nginx/bin/nginx
+  nginxConf: /opt/homebrew/etc/nginx/nginx.conf
+  confDir: ''
