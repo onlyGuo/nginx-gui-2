@@ -4,7 +4,6 @@ import ink.icoding.nginx.utils.CommandUtil;
 import ink.icoding.nginx.utils.CommandUtil.CommandResult;
 import ink.icoding.nginx.utils.FileUtil;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,8 +17,8 @@ import java.util.stream.Collectors;
 public class NginxClient {
 
     private String nginxPath;
-    private Path configPath;
-    private Path confDirPath;
+    private String configPath;
+    private String confDirPath;
 
     /**
      * 无参构造，供 Spring 自动装配使用。
@@ -52,11 +51,24 @@ public class NginxClient {
 //            throw new NginxException("nginx.conf 文件无效: " + configPath);
         }
         this.nginxPath = nginxPath;
-        this.configPath = Paths.get(configPath).toAbsolutePath().normalize();
-        if (confDir != null && !confDir.isBlank()) {
-            this.confDirPath = Paths.get(confDir).toAbsolutePath().normalize();
+        // SSH 模式下路径属于远程服务器，存储原始字符串，避免本地 Path 转换破坏路径
+        // （Windows 的 Paths.get 会加盘符、toString 会用反斜杠）
+        if (CommandUtil.isSshEnabled()) {
+            this.configPath = configPath;
         } else {
-            this.confDirPath = this.configPath.getParent().resolve("conf.d");
+            this.configPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
+        }
+        if (confDir != null && !confDir.isBlank()) {
+            if (CommandUtil.isSshEnabled()) {
+                this.confDirPath = confDir;
+            } else {
+                this.confDirPath = Paths.get(confDir).toAbsolutePath().normalize().toString();
+            }
+        } else {
+            int lastSlash = Math.max(this.configPath.lastIndexOf('/'), this.configPath.lastIndexOf('\\'));
+            this.confDirPath = lastSlash > 0
+                    ? this.configPath.substring(0, lastSlash) + "/conf.d"
+                    : "conf.d";
         }
     }
 
@@ -78,10 +90,10 @@ public class NginxClient {
     // ==================== conf.d 目录 ====================
 
     public List<String> listConfD() {
-        if (!FileUtil.isDirectory(confDirPath.toString())) {
+        if (!FileUtil.isDirectory(confDirPath)) {
             return List.of();
         }
-        return FileUtil.listDirectory(confDirPath.toString()).stream()
+        return FileUtil.listDirectory(confDirPath).stream()
                 .map(item -> (String) item.get("name"))
                 .filter(name -> name.endsWith(".conf"))
                 .sorted()
@@ -89,15 +101,15 @@ public class NginxClient {
     }
 
     public String readConfD(String filename) {
-        return readFile(confDirPath.resolve(filename));
+        return readFile(confDirPath + "/" + filename);
     }
 
     public boolean updateConfD(String filename, String content) {
-        return safeUpdate(confDirPath.resolve(filename), content);
+        return safeUpdate(confDirPath + "/" + filename, content);
     }
 
     public boolean deleteConfD(String filename) {
-        String target = confDirPath.resolve(filename).toString();
+        String target = confDirPath + "/" + filename;
         if (!FileUtil.exists(target)) {
             throw new NginxException("文件不存在: " + target);
         }
@@ -117,7 +129,7 @@ public class NginxClient {
     // ==================== 校验与重载 ====================
 
     public void validateConfig() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-t", "-c", configPath.toString());
+        CommandResult result = CommandUtil.execute(nginxPath, "-t", "-c", configPath);
         if (!result.isSuccess()){
             // 输出内容方便用户排查问题
             throw new NginxException("校验失败 (exitCode=" + result.getExitCode() + "): " + result.getStderr() + ", " + result.getErrorMessage());
@@ -129,7 +141,7 @@ public class NginxClient {
 
 
     public void reload() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-s", "reload", "-c", configPath.toString());
+        CommandResult result = CommandUtil.execute(nginxPath, "-s", "reload", "-c", configPath);
         requireSuccess(result, "nginx -s reload");
     }
 
@@ -139,12 +151,12 @@ public class NginxClient {
     }
 
     public void start() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-c", configPath.toString());
+        CommandResult result = CommandUtil.execute(nginxPath, "-c", configPath);
         requireSuccess(result, "nginx");
     }
 
     public void stop() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-s", "stop", "-c", configPath.toString());
+        CommandResult result = CommandUtil.execute(nginxPath, "-s", "stop", "-c", configPath);
         requireSuccess(result, "nginx -s stop");
     }
 
@@ -163,11 +175,11 @@ public class NginxClient {
         return nginxPath;
     }
 
-    public Path getConfigPath() {
+    public String getConfigPath() {
         return configPath;
     }
 
-    public Path getConfDirPath() {
+    public String getConfDirPath() {
         return confDirPath;
     }
 
@@ -186,19 +198,20 @@ public class NginxClient {
         }
     }
 
-    private boolean safeUpdate(Path target, String content) {
-        String targetStr = target.toString();
-        FileUtil.createDirectories(target.getParent().toString());
+    private boolean safeUpdate(String target, String content) {
+        int lastSlash = Math.max(target.lastIndexOf('/'), target.lastIndexOf('\\'));
+        String parentDir = lastSlash > 0 ? target.substring(0, lastSlash) : ".";
+        FileUtil.createDirectories(parentDir);
 
-        String backup = targetStr + ".bak";
+        String backup = target + ".bak";
         boolean hasBackup = false;
 
-        if (FileUtil.exists(targetStr)) {
-            FileUtil.copy(targetStr, backup, true);
+        if (FileUtil.exists(target)) {
+            FileUtil.copy(target, backup, true);
             hasBackup = true;
         }
 
-        FileUtil.writeFile(targetStr, content);
+        FileUtil.writeFile(target, content);
 
         try {
             validateConfig();
@@ -206,20 +219,19 @@ public class NginxClient {
             return true;
         } catch (NginxException e) {
             if (hasBackup) {
-                FileUtil.move(backup, targetStr, true);
+                FileUtil.move(backup, target, true);
             } else {
-                FileUtil.deleteIfExists(targetStr);
+                FileUtil.deleteIfExists(target);
             }
             throw new NginxException("配置校验失败，已回滚: " + e.getMessage(), e);
         }
     }
 
-    private String readFile(Path path) {
-        String pathStr = path.toString();
-        if (!FileUtil.exists(pathStr)) {
-            throw new NginxException("文件不存在: " + pathStr);
+    private String readFile(String path) {
+        if (!FileUtil.exists(path)) {
+            throw new NginxException("文件不存在: " + path);
         }
-        return FileUtil.readFile(pathStr);
+        return FileUtil.readFile(path);
     }
 
     // ==================== 异常类 ====================

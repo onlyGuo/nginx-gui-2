@@ -3,6 +3,7 @@
     <PathGuard>
     <div class="nginx-config-layout">
     <div class="nginx-config-main">
+    <div v-show="mode === 'ui'" class="nginx-config-scroll">
     <div class="nginx-config">
       <!-- Left: Config File List -->
       <div class="config-list-panel card">
@@ -463,11 +464,42 @@
           </div>
         </div>
       </div>
+    <!-- Code Mode: Editor -->
+    <div v-show="mode === 'code'" class="code-editor-panel">
+      <EditorToolbar
+        :file-name="rawFileName"
+        :status="rawSaveStatus"
+        @reload="fetchRawContent"
+        @save="saveRawContent"
+      />
+      <div class="editor-wrapper">
+        <MonacoEditor
+          v-model="rawContent"
+          language="nginx"
+          @save="saveRawContent"
+        />
+      </div>
     </div>
-    </div>
-    <LogPanel :logs="logs" :status="saveStatus" @clear="logs.splice(0)" />
     </div>
 
+    <!-- Mode Switcher -->
+    <div class="mode-bar">
+      <div class="mode-tabs">
+        <button class="mode-tab" :class="{ active: mode === 'ui' }" @click="switchMode('ui')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          UI 模式
+        </button>
+        <button class="mode-tab" :class="{ active: mode === 'code' }" @click="switchMode('code')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Code 模式
+        </button>
+      </div>
+    </div>
+
+    <LogPanel :logs="logs" :status="saveStatus" @clear="logs.splice(0)" />
+    </div>
+    </div>
+    </div>
     <!-- New File Dialog -->
     <div v-if="showNewFileDialog" class="modal-overlay" @click.self="showNewFileDialog = false">
       <div class="modal-card card">
@@ -510,6 +542,8 @@ import PathSelector from '../components/common/PathSelector.vue'
 import BaseSelect from '../components/common/BaseSelect.vue'
 import BaseCombo from '../components/common/BaseCombo.vue'
 import LogPanel from '../components/common/LogPanel.vue'
+import MonacoEditor from '../components/common/MonacoEditor.vue'
+import EditorToolbar from '../components/common/EditorToolbar.vue'
 
 const upstreamStrategyOpts = [
   { value: '', label: '默认加权轮询', description: '默认策略，按 server 的 weight 参数加权分配请求' },
@@ -623,6 +657,63 @@ function addLog(success, message) {
 }
 
 const saveStatus = reactive({ state: 'idle', message: '', time: null })
+
+// ---- Mode Switcher ----
+const mode = ref('ui')
+const rawContent = ref('')
+const rawFileName = ref('')
+const rawSaveStatus = reactive({ state: 'idle', message: '' })
+
+async function switchMode(newMode) {
+  if (newMode === mode.value) return
+  if (newMode === 'code') {
+    await fetchRawContent()
+  } else {
+    // Switching back to UI: refetch structured config
+    if (activeFile.value) await fetchFileData(activeFile.value)
+    await fetchConfig()
+  }
+  mode.value = newMode
+}
+
+async function fetchRawContent() {
+  if (!activeFile.value) return
+  try {
+    rawFileName.value = activeFile.value
+    const res = await fetch('/api/v1/nginx/config/raw?name=' + encodeURIComponent(rawFileName.value))
+    const json = await res.json()
+    if (json.code === 200 && json.data) {
+      rawContent.value = json.data.content
+    }
+  } catch (e) {
+    addLog(false, '加载配置源码失败: ' + e.message)
+  }
+}
+
+async function saveRawContent() {
+  rawSaveStatus.state = 'pending'
+  try {
+    const res = await fetch('/api/v1/nginx/config/raw', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: rawFileName.value, content: rawContent.value })
+    })
+    const json = await res.json()
+    if (json.code === 200) {
+      rawSaveStatus.state = 'success'
+      rawSaveStatus.message = ''
+      addLog(true, '[' + rawFileName.value + '] 源码已保存')
+    } else {
+      rawSaveStatus.state = 'error'
+      rawSaveStatus.message = json.message
+      addLog(false, '源码保存失败: ' + json.message)
+    }
+  } catch (e) {
+    rawSaveStatus.state = 'error'
+    rawSaveStatus.message = e.message
+    addLog(false, '源码保存异常: ' + e.message)
+  }
+}
 
 let saveTimer = null
 function debounce(fn, ms) {
@@ -864,7 +955,11 @@ function selectFile(name) {
   if (activeFile.value === name) return
   activeFile.value = name
   activeServer.value = 0
-  fetchFileData(name)
+  if (mode.value === 'code') {
+    fetchRawContent()
+  } else {
+    fetchFileData(name)
+  }
 }
 
 onMounted(fetchConfig)
@@ -921,7 +1016,7 @@ let lastUpstreamsJson = serializeForSave(upstreams)
 let lastServersJson = serializeForSave(servers)
 
 watch(upstreams, () => {
-  if (!populating && loaded) {
+  if (!populating && loaded && mode.value === 'ui') {
     const json = serializeForSave(upstreams)
     if (json !== lastUpstreamsJson) {
       lastUpstreamsJson = json
@@ -931,7 +1026,7 @@ watch(upstreams, () => {
 }, { deep: true })
 
 watch(servers, () => {
-  if (!populating && loaded) {
+  if (!populating && loaded && mode.value === 'ui') {
     const json = serializeForSave(servers)
     if (json !== lastServersJson) {
       lastServersJson = json
@@ -1095,6 +1190,12 @@ function locTypeBadge(type) {
   margin: calc(-1 * var(--space-lg));
 }
 .nginx-config-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nginx-config-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1408,5 +1509,54 @@ function locTypeBadge(type) {
 .modal-card {
   width: 420px;
   max-width: 90vw;
+}
+
+/* Mode Bar */
+.mode-bar {
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-secondary);
+  border-bottom: 1px solid var(--border-secondary);
+  padding: 0 var(--space-lg);
+}
+.mode-tabs {
+  display: flex;
+  gap: 0;
+}
+.mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.mode-tab:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+.mode-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Code Editor Panel */
+.code-editor-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-primary);
+}
+.editor-wrapper {
+  flex: 1;
+  min-height: 0;
 }
 </style>

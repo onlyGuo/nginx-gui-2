@@ -22,13 +22,12 @@ public class FileController {
     @GetMapping
     public ApiResponse<Map<String, Object>> list(@RequestParam String path,
                                                   @RequestParam(defaultValue = "file") String type) {
-        Path normalized = Paths.get(path).normalize().toAbsolutePath();
-        String absPath = normalized.toString();
-
+        // SSH 模式下路径属于远程服务器，不能经过本地 Path 解析（Windows 会加盘符、去前导 /）
         if (CommandUtil.isSshEnabled()) {
-            return ApiResponse.ok(listRemote(absPath, type));
+            return ApiResponse.ok(listRemote(path, type));
         }
 
+        Path normalized = Paths.get(path).normalize().toAbsolutePath();
         return ApiResponse.ok(listLocal(normalized, type));
     }
 

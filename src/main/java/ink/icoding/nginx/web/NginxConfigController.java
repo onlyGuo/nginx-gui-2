@@ -36,7 +36,7 @@ public class NginxConfigController {
     public ApiResponse<Map<String, Object>> get() {
         PathConfig pc = loadPathConfig();
         String confPath = pc.getNginxConf();
-        Path confDir = resolveConfDir(pc);
+        String confDir = resolveConfDir(pc);
 
         NginxConfig mainConfig = NginxConfig.parse(FileUtil.readFile(confPath));
         NginxHttpConfItem httpBlock = findHttpBlock(mainConfig);
@@ -52,8 +52,8 @@ public class NginxConfigController {
         }
 
         List<Map<String, Object>> configFiles = new ArrayList<>();
-        if (FileUtil.isDirectory(confDir.toString())) {
-            List<Map<String, Object>> entries = FileUtil.listDirectory(confDir.toString());
+        if (FileUtil.isDirectory(confDir)) {
+            List<Map<String, Object>> entries = FileUtil.listDirectory(confDir);
             for (Map<String, Object> entry : entries) {
                 String fileName = (String) entry.get("name");
                 if (!fileName.endsWith(".conf") && !fileName.endsWith(".conf_off")) continue;
@@ -80,7 +80,7 @@ public class NginxConfigController {
     public ApiResponse<Map<String, Object>> getFile(@RequestParam String name) {
         PathConfig pc = loadPathConfig();
         String confPath = pc.getNginxConf();
-        Path confDir = resolveConfDir(pc);
+        String confDir = resolveConfDir(pc);
         String mainFileName = Path.of(confPath).getFileName().toString();
 
         List<Map<String, Object>> upstreams = new ArrayList<>();
@@ -98,7 +98,7 @@ public class NginxConfigController {
                 }
             }
         } else {
-            String filePath = confDir.resolve(name).toString();
+            String filePath = confDir + "/" + name;
             if (FileUtil.exists(filePath)) {
                 NginxConfig fileConfig = NginxConfig.parse(FileUtil.readFile(filePath));
                 for (NginxConfItem item : fileConfig.getItems()) {
@@ -137,7 +137,7 @@ public class NginxConfigController {
 
         PathConfig pc = loadPathConfig();
         String confPath = pc.getNginxConf();
-        Path confDir = resolveConfDir(pc);
+        String confDir = resolveConfDir(pc);
         String mainFileName = Path.of(confPath).getFileName().toString();
 
         List<Map<String, Object>> upstreams = (List<Map<String, Object>>) body.get("upstreams");
@@ -165,7 +165,7 @@ public class NginxConfigController {
             }
             nginxClient.updateMainConfig(mainConfig.toString());
         } else {
-            String filePath = confDir.resolve(name).toString();
+            String filePath = confDir + "/" + name;
             NginxConfig fileConfig;
             if (FileUtil.exists(filePath)) {
                 fileConfig = NginxConfig.parse(FileUtil.readFile(filePath));
@@ -190,8 +190,8 @@ public class NginxConfigController {
             if (items.isEmpty()) {
                 FileUtil.deleteIfExists(filePath);
             } else {
-                if (!FileUtil.isDirectory(confDir.toString())) {
-                    FileUtil.createDirectories(confDir.toString());
+                if (!FileUtil.isDirectory(confDir)) {
+                    FileUtil.createDirectories(confDir);
                 }
                 FileUtil.writeFile(filePath, fileConfig.toString());
             }
@@ -220,12 +220,12 @@ public class NginxConfigController {
         }
 
         PathConfig pc = loadPathConfig();
-        Path confDir = resolveConfDir(pc);
-        if (!FileUtil.isDirectory(confDir.toString())) {
-            FileUtil.createDirectories(confDir.toString());
+        String confDir = resolveConfDir(pc);
+        if (!FileUtil.isDirectory(confDir)) {
+            FileUtil.createDirectories(confDir);
         }
 
-        String filePath = confDir.resolve(name).toString();
+        String filePath = confDir + "/" + name;
         if (FileUtil.exists(filePath)) {
             return ApiResponse.error(409, "文件已存在: " + name);
         }
@@ -258,8 +258,8 @@ public class NginxConfigController {
         }
 
         PathConfig pc = loadPathConfig();
-        Path confDir = resolveConfDir(pc);
-        String filePath = confDir.resolve(name).toString();
+        String confDir = resolveConfDir(pc);
+        String filePath = confDir + "/" + name;
 
         if (!FileUtil.exists(filePath)) {
             return ApiResponse.error(404, "文件不存在: " + name);
@@ -274,7 +274,7 @@ public class NginxConfigController {
             return ApiResponse.error(400, "不支持的文件后缀: " + name);
         }
 
-        String newPath = confDir.resolve(newName).toString();
+        String newPath = confDir + "/" + newName;
         FileUtil.move(filePath, newPath, false);
 
         nginxClient.validateConfig();
@@ -291,8 +291,8 @@ public class NginxConfigController {
         }
 
         PathConfig pc = loadPathConfig();
-        Path confDir = resolveConfDir(pc);
-        String filePath = confDir.resolve(name).toString();
+        String confDir = resolveConfDir(pc);
+        String filePath = confDir + "/" + name;
 
         if (!FileUtil.exists(filePath)) {
             return ApiResponse.error(404, "文件不存在: " + name);
@@ -300,6 +300,77 @@ public class NginxConfigController {
 
         FileUtil.deleteIfExists(filePath);
         nginxClient.validateConfig();
+        safeReload();
+        return ApiResponse.ok();
+    }
+
+    // ==================== GET /api/v1/nginx/config/raw?name=xxx ====================
+
+    @GetMapping("/raw")
+    public ApiResponse<Map<String, String>> getRaw(@RequestParam String name) {
+        PathConfig pc = loadPathConfig();
+        String confPath = pc.getNginxConf();
+        String mainFileName = Path.of(confPath).getFileName().toString();
+
+        String filePath;
+        if (name.equals(mainFileName)) {
+            filePath = confPath;
+        } else {
+            filePath = resolveConfDir(pc) + "/" + name;
+        }
+
+        Map<String, String> result = new LinkedHashMap<>();
+        result.put("name", name);
+        result.put("content", FileUtil.readFile(filePath));
+        return ApiResponse.ok(result);
+    }
+
+    // ==================== PUT /api/v1/nginx/config/raw ====================
+
+    @PutMapping("/raw")
+    public ApiResponse<Void> updateRaw(@RequestBody Map<String, String> body) {
+        String name = body.get("name");
+        String content = body.get("content");
+        if (name == null || name.isBlank()) {
+            return ApiResponse.error(400, "缺少文件名");
+        }
+        if (content == null) {
+            return ApiResponse.error(400, "缺少内容");
+        }
+
+        PathConfig pc = loadPathConfig();
+        String confPath = pc.getNginxConf();
+        String mainFileName = Path.of(confPath).getFileName().toString();
+
+        String filePath;
+        if (name.equals(mainFileName)) {
+            filePath = confPath;
+        } else {
+            filePath = resolveConfDir(pc) + "/" + name;
+        }
+
+        // 备份 → 写入 → 校验 → 失败则回滚
+        String backup = filePath + ".bak";
+        boolean hasBackup = false;
+        if (FileUtil.exists(filePath)) {
+            FileUtil.copy(filePath, backup, true);
+            hasBackup = true;
+        }
+
+        FileUtil.writeFile(filePath, content);
+
+        try {
+            nginxClient.validateConfig();
+            FileUtil.deleteIfExists(backup);
+        } catch (NginxException e) {
+            if (hasBackup) {
+                FileUtil.move(backup, filePath, true);
+            } else {
+                FileUtil.deleteIfExists(filePath);
+            }
+            return ApiResponse.error(400, "配置校验失败，已回滚: " + e.getMessage());
+        }
+
         safeReload();
         return ApiResponse.ok();
     }
@@ -705,12 +776,14 @@ public class NginxConfigController {
         });
     }
 
-    private Path resolveConfDir(PathConfig pc) {
+    private String resolveConfDir(PathConfig pc) {
         String confDir = pc.getConfDir();
         if (confDir != null && !confDir.isBlank()) {
-            return Path.of(confDir);
+            return confDir;
         }
-        return Path.of(pc.getNginxConf()).getParent().resolve("conf.d");
+        String nginxConf = pc.getNginxConf();
+        int lastSlash = Math.max(nginxConf.lastIndexOf('/'), nginxConf.lastIndexOf('\\'));
+        return lastSlash > 0 ? nginxConf.substring(0, lastSlash) + "/conf.d" : "conf.d";
     }
 
     private String getInlineValue(NginxConfItem block, String name, String defaultVal) {

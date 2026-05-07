@@ -75,7 +75,6 @@ public class PathConfigController {
 
     private void initConfD(PathConfig config) {
         String confPath = config.getNginxConf();
-        Path confFilePath = Path.of(confPath);
         if (!isValidFile(confPath)) {
             return;
         }
@@ -95,7 +94,8 @@ public class PathConfigController {
 
         String confDir = config.getConfDir();
         if (confDir == null || confDir.isBlank()) {
-            confDir = confFilePath.getParent().resolve("conf.d").toString();
+            int lastSlash = Math.max(confPath.lastIndexOf('/'), confPath.lastIndexOf('\\'));
+            confDir = lastSlash > 0 ? confPath.substring(0, lastSlash) + "/conf.d" : "conf.d";
         }
         if (!confDir.endsWith("/")){
             confDir += "/";
