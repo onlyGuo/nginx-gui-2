@@ -26,6 +26,11 @@ const routes = [
     path: '/nginx-config',
     name: 'NginxConfig',
     component: () => import('../views/NginxConfig.vue')
+  },
+  {
+    path: '/firewall',
+    name: 'Firewall',
+    component: () => import('../views/Firewall.vue')
   }
 ]
 

@@ -1,8 +1,10 @@
 <template>
   <AppLayout>
-    <div class="basic-config">
-      <!-- Path Config -->
-      <div class="card">
+    <div class="basic-config-layout">
+      <div class="basic-config-main">
+        <div class="basic-config">
+          <!-- Path Config -->
+          <div class="card">
         <div class="card-header">路径配置</div>
         <div class="card-body">
           <div class="path-grid">
@@ -98,6 +100,14 @@
                 <label class="form-label">隐藏版本号(server_tokens)</label>
                 <label class="switch"><input type="checkbox" v-model="global.serverTokens" /><span class="switch-slider"></span></label>
               </div>
+              <div class="form-group">
+                <label class="form-label">默认MIME类型(default_type)</label>
+                <BaseSelect v-model="global.defaultType" :options="defaultTypeOpts" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">DNS解析器(resolver)</label>
+                <input v-model="global.resolver" placeholder="8.8.8.8 8.8.4.4" />
+              </div>
             </div>
 
             <!-- Gzip -->
@@ -165,13 +175,17 @@
                 <label class="form-label">访问日志格式(access_log format)</label>
                 <BaseCombo v-model="global.accessLogFormat" :options="accessLogFormatOpts" placeholder="combined" />
               </div>
-              <div class="form-group">
-                <label class="form-label">日志格式名称(log_format name)</label>
-                <input v-model="global.logFormatName" placeholder="main" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">日志格式定义(log_format)</label>
-                <BaseCombo v-model="global.logFormatDef" :options="logFormatDefOpts" placeholder='$remote_addr - $remote_user ...' />
+              <div class="form-group log-format-list" style="grid-column: 1 / -1">
+                <div class="log-format-header">
+                  <label class="form-label">日志格式定义(log_format)</label>
+                  <button class="log-format-add" @mousedown.prevent="addLogFormat" title="添加日志格式">+ 添加</button>
+                </div>
+                <div v-if="logFormats.length === 0" class="log-format-empty">暂无自定义日志格式</div>
+                <div v-for="(fmt, i) in logFormats" :key="i" class="log-format-row">
+                  <input class="log-format-name" v-model="fmt.name" placeholder="格式名称，如 main" />
+                  <BaseCombo class="log-format-def" v-model="fmt.def" :options="logFormatDefPresets" placeholder='$remote_addr - $remote_user [$time_local] ...' />
+                  <button class="log-format-del" @mousedown.prevent="logFormats.splice(i, 1)" title="删除">×</button>
+                </div>
               </div>
             </div>
 
@@ -188,20 +202,33 @@
               </div>
             </div>
           </div>
+        </div>
       </div>
+      </div>
+      <LogPanel :logs="logs" :status="saveStatus" @clear="logs.splice(0)" />
     </div>
   </AppLayout>
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import AppLayout from '../components/layout/AppLayout.vue'
 import PathSelector from '../components/common/PathSelector.vue'
 import BaseSelect from '../components/common/BaseSelect.vue'
 import BaseCombo from '../components/common/BaseCombo.vue'
+import LogPanel from '../components/common/LogPanel.vue'
 import { usePathValidation } from '../composables/usePathValidation'
 
 const { valid, checking, check } = usePathValidation()
+
+// ---- Log Panel ----
+const logs = reactive([])
+function addLog(success, message) {
+  logs.push({ time: new Date(), success, message })
+  if (logs.length > 200) logs.splice(0, logs.length - 200)
+}
+
+const saveStatus = reactive({ state: 'idle', message: '', time: null })
 
 let saveTimer = null
 function debounce(fn, ms) {
@@ -243,11 +270,15 @@ const gzipProxiedOpts = [
   { value: 'auth', label: 'auth', description: '对带 Authorization 头的响应压缩' },
   { value: 'any', label: 'any', description: '对所有代理请求进行压缩' }
 ]
-const accessLogFormatOpts = [
-  { value: 'combined', label: 'combined', description: '标准组合格式，包含 Referer 和 User-Agent' },
-  { value: 'common', label: 'common', description: '通用日志格式，仅包含基本请求信息' },
-  { value: 'main', label: 'main', description: '自定义 main 格式，在 log_format 中定义' }
-]
+const accessLogFormatOpts = computed(() => {
+  const builtIn = [
+    { value: 'combined', label: 'combined', description: '标准组合格式，包含 Referer 和 User-Agent' },
+  ]
+  for (const fmt of logFormats) {
+    if (fmt.name) builtIn.push({ value: fmt.name, label: fmt.name, description: '自定义 ' + fmt.name + ' 格式' })
+  }
+  return builtIn
+})
 const eventModelOpts = [
   { value: '', label: 'auto', description: '自动选择最优事件模型' },
   { value: 'epoll', label: 'epoll', description: 'Linux 高性能事件驱动模型' },
@@ -277,7 +308,12 @@ const gzipTypesOpts = [
   { value: '*/*', label: '所有类型', description: '对所有 MIME 类型启用压缩' },
   { value: 'text/plain text/css application/json', label: '最小集合', description: '仅 CSS/JSON 纯文本' }
 ]
-const logFormatDefOpts = [
+const defaultTypeOpts = [
+  { value: 'application/octet-stream', label: 'application/octet-stream', description: '二进制流，通用默认类型' },
+  { value: 'text/plain', label: 'text/plain', description: '纯文本格式' },
+  { value: 'text/html', label: 'text/html', description: 'HTML 网页格式' }
+]
+const logFormatDefPresets = [
   { value: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"', label: 'combined 格式', description: '标准 combined 日志格式' },
   { value: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent', label: 'common 格式', description: '通用日志格式，不含 Referer 和 UA' },
   { value: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time $upstream_response_time', label: '带响应时间', description: '在 combined 基础上增加请求耗时和上游耗时' }
@@ -293,16 +329,32 @@ let pathsPopulating = false
 
 const savePaths = debounce(async () => {
   if (pathsPopulating) return
+  saveStatus.state = 'pending'
   try {
-    await fetch('/api/v1/paths', {
+    const res = await fetch('/api/v1/paths', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nginxBin: paths.nginxBin, nginxConf: paths.nginxConf, confDir: paths.confDir })
     })
+    const json = await res.json()
+    if (json.code === 200) {
+      saveStatus.state = 'success'
+      saveStatus.message = ''
+      saveStatus.time = new Date()
+      addLog(true, '路径配置已保存')
+    } else {
+      saveStatus.state = 'error'
+      saveStatus.message = json.message
+      saveStatus.time = new Date()
+      addLog(false, '路径配置保存失败: ' + json.message)
+    }
     await check()
     if (valid.value) await fetchGlobalConfig()
   } catch (e) {
-    console.error('保存路径配置失败:', e)
+    saveStatus.state = 'error'
+    saveStatus.message = e.message
+    saveStatus.time = new Date()
+    addLog(false, '路径配置保存异常: ' + e.message)
   }
 }, 1000)
 
@@ -347,6 +399,8 @@ const fieldMap = [
   { field: 'clientHeaderTimeout',    path: 'http.client_header_timeout',toApi: v => v,     fromApi: v => v || '60' },
   { field: 'typesHashMaxSize',       path: 'http.types_hash_max_size',  toApi: v => v,     fromApi: v => v || '2048' },
   { field: 'serverTokens',           path: 'http.server_tokens',     toApi: v => v ? 'on' : 'off', fromApi: v => v === 'on' },
+  { field: 'defaultType',            path: 'http.default_type',     toApi: v => v,        fromApi: v => v || 'application/octet-stream' },
+  { field: 'resolver',               path: 'http.resolver',         toApi: v => v,        fromApi: v => v || '' },
   { field: 'gzip',                   path: 'http.gzip',              toApi: v => v ? 'on' : 'off', fromApi: v => v === 'on' },
   { field: 'gzipMinLength',          path: 'http.gzip_min_length',   toApi: v => v,        fromApi: v => v || '1024' },
   { field: 'gzipCompLevel',          path: 'http.gzip_comp_level',   toApi: v => v,        fromApi: v => v || '6' },
@@ -360,12 +414,14 @@ const fieldMap = [
   { field: 'sslSessionCache',        path: 'http.ssl_session_cache', toApi: v => v,        fromApi: v => v || '' },
   { field: 'accessLog',              path: 'http.access_log',        toApi: v => v,        fromApi: v => v || '' },
   { field: 'accessLogFormat',        path: 'http.access_log_format', toApi: v => v,        fromApi: v => v || 'combined' },
-  { field: 'logFormatName',          path: 'http.log_format_name',   toApi: v => v,        fromApi: v => v || '' },
-  { field: 'logFormatDef',           path: 'http.log_format_def',    toApi: v => v,        fromApi: v => v || '' },
 ]
 
 const defaultValues = Object.fromEntries(fieldMap.map(m => [m.field, m.fromApi(undefined)]))
 const global = reactive({ ...defaultValues })
+const logFormats = reactive([])
+function addLogFormat() {
+  logFormats.push({ name: '', def: '' })
+}
 const globalAnchors = ref({})
 const globalConfig = ref({})
 let globalLoaded = false
@@ -379,6 +435,12 @@ function populateForm(config) {
     const key = keys.length > 1 ? keys[1] : keys[0]
     const raw = section?.[key]
     global[m.field] = m.fromApi(raw)
+  }
+  // log_format 列表
+  logFormats.splice(0)
+  const fmts = config.http?.log_format
+  if (Array.isArray(fmts)) {
+    for (const f of fmts) logFormats.push({ name: f.name || '', def: f.def || '' })
   }
   populating = false
 }
@@ -412,7 +474,6 @@ function buildPatches() {
   const compounds = [
     { paths: ['error_log', 'error_log_level'], combine: (vals) => vals.error_log + (vals.error_log_level ? ' ' + vals.error_log_level : '') },
     { paths: ['http.access_log', 'http.access_log_format'], combine: (vals) => vals['http.access_log'] + (vals['http.access_log_format'] ? ' ' + vals['http.access_log_format'] : '') },
-    { paths: ['http.log_format_name', 'http.log_format_def'], combine: (vals) => vals['http.log_format_name'] + " '" + (vals['http.log_format_def'] || '') + "'" },
   ]
   const compoundPaths = new Set(compounds.flatMap(c => c.paths))
 
@@ -440,6 +501,16 @@ function buildPatches() {
       patches.push({ path: m.path, itemIndex: anchor?.itemIndex ?? -1, value: newValue })
     }
   }
+
+  // log_format 列表
+  const rawFormats = globalConfig.value.http?.log_format || []
+  const curFormats = logFormats.filter(f => f.name && f.def)
+  const rawStr = JSON.stringify(rawFormats.map(f => [f.name, f.def]))
+  const curStr = JSON.stringify(curFormats.map(f => [f.name, f.def]))
+  if (rawStr !== curStr) {
+    patches.push({ path: 'http.log_format', value: curFormats.map(f => ({ name: f.name, def: f.def })) })
+  }
+
   return patches
 }
 
@@ -448,7 +519,9 @@ let saving = false
 const saveGlobalConfig = debounce(async () => {
   const patches = buildPatches()
   if (patches.length === 0) return
+  const fields = patches.map(p => p.path).join(', ')
   saving = true
+  saveStatus.state = 'pending'
   try {
     const res = await fetch('/api/v1/nginx/global-config', {
       method: 'PUT',
@@ -457,12 +530,22 @@ const saveGlobalConfig = debounce(async () => {
     })
     const json = await res.json()
     if (json.code === 200) {
+      saveStatus.state = 'success'
+      saveStatus.message = ''
+      saveStatus.time = new Date()
+      addLog(true, '全局配置已保存: ' + fields)
       await fetchGlobalConfig()
     } else {
-      console.error('保存全局配置失败:', json.message)
+      saveStatus.state = 'error'
+      saveStatus.message = json.message
+      saveStatus.time = new Date()
+      addLog(false, '全局配置保存失败 [' + fields + ']: ' + json.message)
     }
   } catch (e) {
-    console.error('保存全局配置失败:', e)
+    saveStatus.state = 'error'
+    saveStatus.message = e.message
+    saveStatus.time = new Date()
+    addLog(false, '全局配置保存异常 [' + fields + ']: ' + e.message)
   } finally {
     saving = false
   }
@@ -472,9 +555,27 @@ const saveGlobalConfig = debounce(async () => {
 watch(global, () => {
   if (!populating && !saving && globalLoaded) saveGlobalConfig()
 }, { deep: true })
+
+// 监听 logFormats 列表变化，自动保存
+watch(logFormats, () => {
+  if (!populating && !saving && globalLoaded) saveGlobalConfig()
+}, { deep: true })
 </script>
 
 <style scoped>
+.basic-config-layout {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 36px);
+  margin: calc(-1 * var(--space-lg));
+}
+.basic-config-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
 .basic-config {
   display: flex;
   flex-direction: column;
@@ -513,5 +614,80 @@ watch(global, () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-md) var(--space-xl);
+}
+.log-format-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.log-format-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.log-format-add {
+  padding: 2px 10px;
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  background: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.log-format-add:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+.log-format-empty {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) 0;
+}
+.log-format-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.log-format-name {
+  width: 140px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast);
+}
+.log-format-name:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+.log-format-def {
+  flex: 1;
+  min-width: 0;
+}
+.log-format-del {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.log-format-del:hover {
+  background: var(--color-error-bg, #fef2f2);
+  border-color: var(--color-error, #ef5350);
+  color: var(--color-error, #ef5350);
 }
 </style>

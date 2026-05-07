@@ -5,13 +5,11 @@ import ink.icoding.nginx.config.PathConfigRepository;
 import ink.icoding.nginx.core.NginxClient;
 import ink.icoding.nginx.core.NginxConfig;
 import ink.icoding.nginx.entity.*;
+import ink.icoding.nginx.utils.FileUtil;
 import jakarta.annotation.PostConstruct;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +47,9 @@ public class PathConfigController {
         PathConfig config = loadConfig();
         boolean binValid = isValidFile(config.getNginxBin());
         boolean confValid = isValidFile(config.getNginxConf());
+        if (!confValid){
+            System.out.println("nginxConf invalid: " + config.getNginxConf());
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("nginxBin", binValid);
@@ -88,13 +89,16 @@ public class PathConfigController {
             }
         }
         if (httpBlock == null) {
-            httpBlock = new NginxHttpConfItem("http");
+            httpBlock = new NginxHttpConfItem("http {\n}");
             nginxConfig.getItems().add(httpBlock);
         }
 
         String confDir = config.getConfDir();
         if (confDir == null || confDir.isBlank()) {
             confDir = confFilePath.getParent().resolve("conf.d").toString();
+        }
+        if (!confDir.endsWith("/")){
+            confDir += "/";
         }
         String includePattern = confDir + "*.conf";
         String includeAbsPath = (StringUtils.hasText(config.getConfDir()) ? confDir : "conf.d");
@@ -117,13 +121,8 @@ public class PathConfigController {
             }
         }
 
-        Path confDirPath = Path.of(confDir);
-        if (!Files.isDirectory(confDirPath)) {
-            try {
-                Files.createDirectories(confDirPath);
-            } catch (IOException e) {
-                throw new NginxClient.NginxException("创建 conf.d 目录失败: " + confDirPath, e);
-            }
+        if (!FileUtil.isDirectory(confDir)) {
+            FileUtil.createDirectories(confDir);
         }
 
         subItems.add(new NginxInlineConfItem("#Nginx GUI Auto Insert: Include conf.d/*.conf"));
@@ -148,18 +147,11 @@ public class PathConfigController {
     }
 
     private boolean isValidFile(String path) {
-        if (path == null || path.isBlank()) {
-            return false;
-        }
-        Path p1 = Path.of(path);
-        return Files.exists(p1) && Files.isRegularFile(p1);
+        if (path == null || path.isBlank()) return false;
+        return FileUtil.isRegularFile(path);
     }
 
     private String readFile(String path) {
-        try {
-            return Files.readString(Path.of(path), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new NginxClient.NginxException("读取配置文件失败: " + path, e);
-        }
+        return FileUtil.readFile(path);
     }
 }

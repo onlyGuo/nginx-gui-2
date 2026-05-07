@@ -7,12 +7,9 @@ import ink.icoding.nginx.core.NginxClient;
 import ink.icoding.nginx.core.NginxClient.BadRequestException;
 import ink.icoding.nginx.core.NginxClient.NginxException;
 import ink.icoding.nginx.entity.*;
+import ink.icoding.nginx.utils.FileUtil;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 @RestController
@@ -20,6 +17,16 @@ import java.util.*;
 public class NginxGlobalConfigController {
 
     private static final Long CONFIG_ID = 1L;
+
+    /**
+     * 配置路径 → nginx 指令名映射。
+     * 大部分路径去掉前缀后就是指令名，只有少数例外。
+     */
+    private static final Map<String, String> DIRECTIVE_MAP = Map.ofEntries(
+            Map.entry("error_log_level", "error_log"),
+            Map.entry("http.access_log_format", "access_log"),
+            Map.entry("http.log_format", "log_format")
+    );
 
     private final PathConfigRepository pathConfigRepository;
 
@@ -80,10 +87,11 @@ public class NginxGlobalConfigController {
                 "http.keepalive_timeout", "http.keepalive_requests",
                 "http.client_max_body_size", "http.client_body_timeout", "http.client_header_timeout",
                 "http.types_hash_max_size", "http.server_tokens",
+                "http.default_type", "http.resolver",
                 "http.gzip", "http.gzip_min_length", "http.gzip_comp_level", "http.gzip_types", "http.gzip_vary", "http.gzip_proxied",
                 "http.ssl_protocols", "http.ssl_ciphers", "http.ssl_prefer_server_ciphers", "http.ssl_session_timeout", "http.ssl_session_cache",
                 "http.access_log", "http.access_log_format",
-                "http.log_format_name", "http.log_format_def");
+                "http.log_format");
 
         // 组装响应
         Map<String, Object> configMap = new LinkedHashMap<>();
@@ -129,6 +137,14 @@ public class NginxGlobalConfigController {
 
         for (Map<String, Object> patch : patches) {
             String path = (String) patch.get("path");
+
+            // log_format 是列表字段，整体替换
+            if ("http.log_format".equals(path)) {
+                if (httpBlock == null) throw new NginxException("未找到 http 块");
+                replaceLogFormats(httpBlock.listSubItems(), patch.get("value"));
+                continue;
+            }
+
             String value = String.valueOf(patch.get("value"));
             Number indexNum = (Number) patch.get("itemIndex");
             if (path == null || indexNum == null) {
@@ -136,21 +152,18 @@ public class NginxGlobalConfigController {
             }
             int itemIndex = indexNum.intValue();
 
+            String directiveName = DIRECTIVE_MAP.getOrDefault(path, stripPrefix(path));
+
             if (path.startsWith("events.")) {
-                // events 块内的指令
                 if (eventsBlock == null) throw new NginxException("未找到 events 块");
-                String directiveName = path.substring("events.".length());
                 replaceItem(eventsBlock.listSubItems(), itemIndex, directiveName, value);
 
             } else if (path.startsWith("http.")) {
-                // http 块内的指令
                 if (httpBlock == null) throw new NginxException("未找到 http 块");
-                String directiveName = path.substring("http.".length());
                 replaceItem(httpBlock.listSubItems(), itemIndex, directiveName, value);
 
             } else {
-                // main 级别指令
-                replaceMainItem(items, itemIndex, path, value);
+                replaceMainItem(items, itemIndex, directiveName, value);
             }
         }
 
@@ -260,6 +273,8 @@ public class NginxGlobalConfigController {
                 case "client_header_timeout" -> { values.put("client_header_timeout", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
                 case "types_hash_max_size" -> { values.put("types_hash_max_size", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
                 case "server_tokens" -> { values.put("server_tokens", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
+                case "default_type" -> { values.put("default_type", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
+                case "resolver" -> { values.put("resolver", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
                 case "gzip" -> { values.put("gzip", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
                 case "gzip_min_length" -> { values.put("gzip_min_length", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
                 case "gzip_comp_level" -> { values.put("gzip_comp_level", inline.getValue()); anchors.put(key, makeSubAnchor(blockIndex, i, inline)); }
@@ -285,10 +300,13 @@ public class NginxGlobalConfigController {
                     String val = inline.getValue();
                     String[] parts = val.split("\\s+", 2);
                     if (parts.length > 1) {
-                        values.put("log_format_name", parts[0]);
-                        values.put("log_format_def", stripQuotes(parts[1]));
-                        anchors.put("http.log_format_name", makeSubAnchor(blockIndex, i, inline));
-                        anchors.put("http.log_format_def", makeSubAnchor(blockIndex, i, inline));
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, String>> formats = (List<Map<String, String>>) values.computeIfAbsent("log_format", k -> new ArrayList<>());
+                        Map<String, String> entry = new LinkedHashMap<>();
+                        entry.put("name", parts[0]);
+                        entry.put("def", stripQuotes(parts[1]));
+                        formats.add(entry);
+                        anchors.put("http.log_format", makeSubAnchor(blockIndex, i, inline));
                     }
                 }
             }
@@ -296,6 +314,53 @@ public class NginxGlobalConfigController {
     }
 
     // ==================== 工具方法 ====================
+
+    /**
+     * 整体替换 log_format 列表：删除所有已有 log_format 条目，插入新列表。
+     */
+    @SuppressWarnings("unchecked")
+    private void replaceLogFormats(List<NginxConfItem> items, Object value) {
+        List<Map<String, String>> entries;
+        if (value instanceof List<?> rawList) {
+            entries = new ArrayList<>();
+            for (Object item : rawList) {
+                if (item instanceof Map<?, ?> map) {
+                    Map<String, String> entry = new LinkedHashMap<>();
+                    entry.put("name", String.valueOf(map.get("name")));
+                    entry.put("def", String.valueOf(map.get("def")));
+                    entries.add(entry);
+                }
+            }
+        } else {
+            throw new NginxException("log_format 值必须是列表");
+        }
+
+        // 从后往前删除所有 log_format 条目
+        for (int i = items.size() - 1; i >= 0; i--) {
+            NginxConfItem item = items.get(i);
+            if (item instanceof NginxInlineConfItem inline && "log_format".equals(inline.getName())) {
+                items.remove(i);
+            }
+        }
+
+        // 找到 access_log 的位置，在它之前插入 log_format（nginx 要求 log_format 在 access_log 之前定义）
+        int insertPos = items.size();
+        for (int i = 0; i < items.size(); i++) {
+            NginxConfItem item = items.get(i);
+            if (item instanceof NginxInlineConfItem inline && "access_log".equals(inline.getName())) {
+                insertPos = i;
+                break;
+            }
+        }
+
+        // 在 access_log 之前插入新条目
+        for (Map<String, String> entry : entries) {
+            String name = entry.get("name");
+            String def = entry.get("def");
+            items.add(insertPos, new NginxInlineConfItem("log_format " + name + " '" + def + "';"));
+            insertPos++;
+        }
+    }
 
     /**
      * 替换或插入 main 级别指令。index=-1 时插入到第一个块之前。
@@ -351,6 +416,11 @@ public class NginxGlobalConfigController {
         }
     }
 
+    private String stripPrefix(String path) {
+        int dot = path.indexOf('.');
+        return dot >= 0 ? path.substring(dot + 1) : path;
+    }
+
     private Map<String, Object> makeAnchor(int itemIndex, NginxInlineConfItem item) {
         Map<String, Object> anchor = new LinkedHashMap<>();
         anchor.put("itemIndex", itemIndex);
@@ -375,11 +445,7 @@ public class NginxGlobalConfigController {
     }
 
     private String readFile(String path) {
-        try {
-            return Files.readString(Path.of(path), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new NginxException("读取配置文件失败: " + path, e);
-        }
+        return FileUtil.readFile(path);
     }
 
     private String stripQuotes(String s) {

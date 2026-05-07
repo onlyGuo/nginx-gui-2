@@ -2,13 +2,12 @@ package ink.icoding.nginx.core;
 
 import ink.icoding.nginx.utils.CommandUtil;
 import ink.icoding.nginx.utils.CommandUtil.CommandResult;
+import ink.icoding.nginx.utils.FileUtil;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Nginx 配置管理客户端
@@ -63,7 +62,7 @@ public class NginxClient {
 
     private boolean isValidFile(String path) {
         if (path == null || path.isBlank()) return false;
-        return Files.exists(Path.of(path)) && Files.isRegularFile(Path.of(path));
+        return FileUtil.isRegularFile(path);
     }
 
     // ==================== 主配置文件 ====================
@@ -73,26 +72,20 @@ public class NginxClient {
     }
 
     public void updateMainConfig(String content) {
-        if (!safeUpdate(configPath, content)) {
-            throw new NginxException("配置校验失败，已回滚");
-        }
+        safeUpdate(configPath, content);
     }
 
     // ==================== conf.d 目录 ====================
 
     public List<String> listConfD() {
-        if (!Files.isDirectory(confDirPath)) {
+        if (!FileUtil.isDirectory(confDirPath.toString())) {
             return List.of();
         }
-        try (Stream<Path> stream = Files.list(confDirPath)) {
-            return stream
-                    .filter(p -> p.toString().endsWith(".conf"))
-                    .map(p -> p.getFileName().toString())
-                    .sorted()
-                    .collect(Collectors.toList());
-        } catch (IOException e) {
-            throw new NginxException("列出 conf.d 目录失败: " + e.getMessage(), e);
-        }
+        return FileUtil.listDirectory(confDirPath.toString()).stream()
+                .map(item -> (String) item.get("name"))
+                .filter(name -> name.endsWith(".conf"))
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     public String readConfD(String filename) {
@@ -104,35 +97,20 @@ public class NginxClient {
     }
 
     public boolean deleteConfD(String filename) {
-        Path target = confDirPath.resolve(filename);
-        if (!Files.exists(target)) {
+        String target = confDirPath.resolve(filename).toString();
+        if (!FileUtil.exists(target)) {
             throw new NginxException("文件不存在: " + target);
         }
-        Path backup = backupPath(target);
-        try {
-            Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new NginxException("备份文件失败: " + e.getMessage(), e);
-        }
-        try {
-            Files.delete(target);
-        } catch (IOException e) {
-            silentDelete(backup);
-            throw new NginxException("删除文件失败: " + e.getMessage(), e);
-        }
+        String backup = target + ".bak";
+        FileUtil.copy(target, backup, true);
+        FileUtil.deleteIfExists(target);
         try {
             validateConfig();
-            silentDelete(backup);
+            FileUtil.deleteIfExists(backup);
             return true;
-        }catch (NginxException e) {
-            //  删除后校验失败，尝试回退
-            try {
-                Files.move(backup, target, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException ex) {
-                throw new NginxException("校验失败且回退文件失败，请手动恢复: " + target
-                        + "，备份位于: " + backup, ex);
-            }
-            return false;
+        } catch (NginxException e) {
+            FileUtil.move(backup, target, true);
+            throw new NginxException("配置校验失败，已回滚: " + e.getMessage(), e);
         }
     }
 
@@ -141,6 +119,7 @@ public class NginxClient {
     public void validateConfig() {
         CommandResult result = CommandUtil.execute(nginxPath, "-t", "-c", configPath.toString());
         if (!result.isSuccess()){
+            // 输出内容方便用户排查问题
             throw new NginxException("校验失败 (exitCode=" + result.getExitCode() + "): " + result.getStderr() + ", " + result.getErrorMessage());
         }
         if (result.getErrorMessage() != null) {
@@ -208,77 +187,39 @@ public class NginxClient {
     }
 
     private boolean safeUpdate(Path target, String content) {
-        ensureParentDir(target);
+        String targetStr = target.toString();
+        FileUtil.createDirectories(target.getParent().toString());
 
-        Path backup = backupPath(target);
+        String backup = targetStr + ".bak";
         boolean hasBackup = false;
 
-        if (Files.exists(target)) {
-            try {
-                Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING);
-                hasBackup = true;
-            } catch (IOException e) {
-                throw new NginxException("备份文件失败: " + target, e);
-            }
+        if (FileUtil.exists(targetStr)) {
+            FileUtil.copy(targetStr, backup, true);
+            hasBackup = true;
         }
 
-        try {
-            Files.writeString(target, content, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            silentDelete(backup);
-            throw new NginxException("写入文件失败: " + target, e);
-        }
+        FileUtil.writeFile(targetStr, content);
 
         try {
             validateConfig();
-            silentDelete(backup);
+            FileUtil.deleteIfExists(backup);
             return true;
         } catch (NginxException e) {
             if (hasBackup) {
-                try {
-                    Files.move(backup, target, StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e1) {
-                    throw new NginxException("校验失败且回退文件失败，请手动恢复: " + target
-                            + "，备份位于: " + backup, e1);
-                }
+                FileUtil.move(backup, targetStr, true);
             } else {
-                silentDelete(target);
+                FileUtil.deleteIfExists(targetStr);
             }
-            return false;
+            throw new NginxException("配置校验失败，已回滚: " + e.getMessage(), e);
         }
     }
 
     private String readFile(Path path) {
-        if (!Files.exists(path)) {
-            throw new NginxException("文件不存在: " + path);
+        String pathStr = path.toString();
+        if (!FileUtil.exists(pathStr)) {
+            throw new NginxException("文件不存在: " + pathStr);
         }
-        try {
-            return Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new NginxException("读取文件失败: " + path, e);
-        }
-    }
-
-    private void ensureParentDir(Path file) {
-        Path parent = file.getParent();
-        if (parent != null && !Files.isDirectory(parent)) {
-            try {
-                Files.createDirectories(parent);
-            } catch (IOException e) {
-                throw new NginxException("创建目录失败: " + parent, e);
-            }
-        }
-    }
-
-    private Path backupPath(Path original) {
-        return original.getParent().resolve(original.getFileName() + ".bak");
-    }
-
-    private void silentDelete(Path path) {
-        try {
-            Files.deleteIfExists(path);
-        } catch (IOException ignored) {
-        }
+        return FileUtil.readFile(pathStr);
     }
 
     // ==================== 异常类 ====================

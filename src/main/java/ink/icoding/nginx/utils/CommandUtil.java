@@ -1,5 +1,7 @@
 package ink.icoding.nginx.utils;
 
+import ink.icoding.nginx.config.SshSessionManager;
+
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,22 @@ public final class CommandUtil {
         t.setDaemon(true);
         return t;
     });
+
+    private static volatile SshSessionManager sshSessionManager;
+
+    /**
+     * 设置 SSH 会话管理器（由 Spring 配置在启动时调用）
+     */
+    public static void setSshSessionManager(SshSessionManager manager) {
+        sshSessionManager = manager;
+    }
+
+    /**
+     * 是否启用了 SSH 远程执行
+     */
+    public static boolean isSshEnabled() {
+        return sshSessionManager != null;
+    }
 
     private CommandUtil() {
     }
@@ -87,6 +105,32 @@ public final class CommandUtil {
      * @return 命令执行结果
      */
     public static CommandResult execute(File workDir, Charset charset, long timeoutMs, String... command) {
+        SshSessionManager ssh = sshSessionManager;
+        if (ssh != null) {
+            return ssh.executeCommand(toSshCommand(command));
+        }
+        return executeLocal(workDir, charset, timeoutMs, command);
+    }
+
+    /**
+     * 将命令参数转为 SSH 可执行的命令字符串
+     * <p>
+     * 本地执行时 ProcessBuilder 会用 /bin/sh -c 包装，但 SSH 的 ChannelExec
+     * 本身就在远程 shell 中执行，需要去掉这个包装。
+     */
+    private static String toSshCommand(String... command) {
+        if (command.length == 1) {
+            return command[0];
+        }
+        // 去掉 "/bin/sh", "-c", cmd 或 "cmd", "/c", cmd 这种 shell 包装
+        if (command.length == 3 && "-c".equals(command[1])
+                && ("/bin/sh".equals(command[0]) || "cmd".equals(command[0]))) {
+            return command[2];
+        }
+        return String.join(" ", command);
+    }
+
+    private static CommandResult executeLocal(File workDir, Charset charset, long timeoutMs, String... command) {
         Process process = null;
         try {
             process = startProcess(workDir, command);
@@ -160,6 +204,14 @@ public final class CommandUtil {
      * @return CommandStream，可用于停止命令
      */
     public static CommandStream stream(File workDir, Charset charset, String command, Consumer<String> listener) {
+        SshSessionManager ssh = sshSessionManager;
+        if (ssh != null) {
+            return ssh.streamCommand(command, listener);
+        }
+        return streamLocal(workDir, charset, command, listener);
+    }
+
+    private static CommandStream streamLocal(File workDir, Charset charset, String command, Consumer<String> listener) {
         Charset cs = charset != null ? charset : DEFAULT_CHARSET;
         Process process;
         try {
@@ -285,15 +337,15 @@ public final class CommandUtil {
             this.errorMessage = errorMessage;
         }
 
-        CommandResult(int exitCode, String stdout, String stderr) {
+        public CommandResult(int exitCode, String stdout, String stderr) {
             this(exitCode, stdout, stderr, false, null);
         }
 
-        static CommandResult timeout(String stderr) {
+        public static CommandResult timeout(String stderr) {
             return new CommandResult(-1, "", stderr, true, "命令执行超时");
         }
 
-        static CommandResult error(String message) {
+        public static CommandResult error(String message) {
             return new CommandResult(-1, "", "", false, message);
         }
 

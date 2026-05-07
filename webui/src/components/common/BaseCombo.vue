@@ -82,11 +82,12 @@ const normalizedOptions = computed(() =>
 )
 
 const filteredOptions = computed(() => {
-  const val = props.modelValue.toLowerCase()
-  if (!val) return normalizedOptions.value
-  return normalizedOptions.value.filter(o =>
-    o.label.toLowerCase().includes(val) || o.rawValue.toLowerCase().includes(val)
-  )
+  // const val = props.modelValue.toLowerCase()
+  // if (!val) return normalizedOptions.value
+  // return normalizedOptions.value.filter(o =>
+  //   o.label.toLowerCase().includes(val) || o.rawValue.toLowerCase().includes(val)
+  // )
+  return normalizedOptions.value
 })
 
 function toggle() {
