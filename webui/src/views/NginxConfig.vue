@@ -86,17 +86,19 @@
                         </button>
                       </div>
                       <div v-if="up._open" class="upstream-detail">
-                        <div class="form-group">
-                          <label class="form-label">名称</label>
-                          <input v-model="up.name" placeholder="backend" />
-                        </div>
-                        <div class="form-group">
-                          <label class="form-label">负载策略(upstream strategy)</label>
-                          <BaseSelect v-model="up.strategy" :options="upstreamStrategyOpts" />
-                        </div>
-                        <div class="form-group">
-                          <label class="form-label">长连接数(keepalive)</label>
-                          <input v-model="up.keepalive" type="number" placeholder="32" />
+                        <div class="upstream-inline-form">
+                          <div class="form-group upstream-inline-field upstream-inline-name">
+                            <label class="form-label">名称</label>
+                            <input v-model="up.name" placeholder="backend" />
+                          </div>
+                          <div class="form-group upstream-inline-field upstream-inline-strategy">
+                            <label class="form-label">负载策略(upstream strategy)</label>
+                            <BaseSelect v-model="up.strategy" :options="upstreamStrategyOpts" />
+                          </div>
+                          <div class="form-group upstream-inline-field upstream-inline-keepalive">
+                            <label class="form-label">长连接数(keepalive)</label>
+                            <input v-model="up.keepalive" type="number" placeholder="32" />
+                          </div>
                         </div>
                         <div class="upstream-servers">
                           <div class="flex items-center justify-between" style="margin-bottom:4px">
@@ -1187,23 +1189,28 @@ function locTypeBadge(type) {
   flex-direction: column;
   height: calc(100vh - 36px);
   margin: calc(-1 * var(--space-lg));
+  overflow: hidden;
 }
 .nginx-config-main {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .nginx-config-scroll {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 .nginx-config {
   display: flex;
   gap: var(--space-md);
   min-width: 0;
   padding: var(--space-lg);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Left Panel */
@@ -1213,9 +1220,11 @@ function locTypeBadge(type) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 .config-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-xs);
 }
@@ -1279,13 +1288,15 @@ function locTypeBadge(type) {
   gap: var(--space-md);
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Top Section */
 .detail-top {
   display: flex;
   gap: var(--space-md);
-  flex: 0 0 auto;
+  flex: 0 0 200px;
+  min-height: 0;
 }
 .common-card {
   flex: 1;
@@ -1297,13 +1308,16 @@ function locTypeBadge(type) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 .upstream-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: 280px;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
+  align-content: flex-start;
   align-items: flex-start;
 }
 .upstream-body .upstream-item {
@@ -1337,8 +1351,26 @@ function locTypeBadge(type) {
   font-family: var(--font-mono);
 }
 .upstream-detail {
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border-top: 1px solid var(--border-secondary);
+}
+.upstream-inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 110px;
+  gap: var(--space-sm);
+  align-items: end;
+  margin-bottom: var(--space-sm);
+}
+.upstream-inline-field {
+  margin-bottom: 0;
+  min-width: 0;
+}
+.upstream-inline-field :deep(.base-select),
+.upstream-inline-field :deep(.base-combo) {
+  width: 100%;
+}
+.upstream-inline-keepalive input {
+  width: 100%;
 }
 .upstream-servers {
   margin-top: var(--space-sm);
@@ -1361,6 +1393,7 @@ function locTypeBadge(type) {
   display: flex;
   gap: var(--space-md);
   min-height: 0;
+  overflow: hidden;
 }
 .server-list-card {
   width: 200px;
@@ -1368,9 +1401,11 @@ function locTypeBadge(type) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 .server-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-xs);
 }
@@ -1408,11 +1443,14 @@ function locTypeBadge(type) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 .server-empty-card {
   flex: 1;
 }
 .server-detail-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
