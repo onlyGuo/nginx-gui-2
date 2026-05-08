@@ -2,503 +2,502 @@
   <AppLayout>
     <PathGuard>
     <div class="nginx-config-layout">
-    <div class="nginx-config-main">
-    <div v-show="mode === 'ui'" class="nginx-config-scroll">
-    <div class="nginx-config">
-      <!-- Left: Config File List -->
-      <div class="config-list-panel card">
-        <div class="card-header">
-          <span>配置文件</span>
-          <button class="btn btn-sm btn-icon" @click="showNewFileDialog = true" title="新建配置">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-        </div>
-        <div class="config-list">
-          <!-- nginx.conf special entry -->
-          <div
-            v-if="hasMainBlocks"
-            class="config-item config-item-main"
-            :class="{ active: activeFile === mainFileName }"
-            @click="selectFile(mainFileName)"
-          >
-            <div class="config-item-row">
-              <span class="config-item-name" style="color: var(--warning)">nginx.conf</span>
-            </div>
-            <div class="config-item-meta">
-              <span class="text-xs" style="color: var(--warning)">不建议在此配置代理</span>
-            </div>
-            <button class="btn btn-sm btn-ghost" style="margin-top:4px;font-size:11px;color:var(--danger)" @click.stop="clearMainBlocks">
-              一键清除代理配置
-            </button>
-          </div>
-
-          <!-- conf.d files -->
-          <div
-            v-for="f in configFiles"
-            :key="f.name"
-            class="config-item"
-            :class="{ active: activeFile === f.name, disabled: !f.enabled }"
-            @click="selectFile(f.name)"
-          >
-            <div class="config-item-row">
-              <span class="config-item-name">{{ f.name }}</span>
-              <div class="config-item-actions">
-                <label class="switch" @click.stop>
-                  <input type="checkbox" :checked="f.enabled" @change="toggleFile(f)" /><span class="switch-slider"></span>
-                </label>
-                <button class="btn btn-sm btn-ghost" @click.stop="deleteFile(f)" title="删除">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      <div class="nginx-config-main">
+        <div v-show="mode === 'ui'" class="nginx-config-scroll">
+          <div class="nginx-config">
+            <!-- Left: Config File List -->
+            <div class="config-list-panel card">
+              <div class="card-header">
+                <span>配置文件</span>
+                <button class="btn btn-sm btn-icon" @click="showNewFileDialog = true" title="新建配置">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
               </div>
-            </div>
-            <div class="config-item-meta">
-              <span class="text-xs text-tertiary">{{ f.enabled ? '已启用' : '已停用' }}</span>
-              <span class="text-xs text-tertiary">{{ f.time }}</span>
-            </div>
-          </div>
-
-          <div v-if="!hasMainBlocks && configFiles.length === 0" class="config-empty">暂无配置文件</div>
-        </div>
-      </div>
-
-      <!-- Right: Detail -->
-      <div class="config-detail-panel">
-        <!-- Top: Upstream (full width) -->
-        <div class="detail-top">
-          <!-- Upstream -->
-          <div class="card upstream-card-full">
-            <div class="card-header">
-              <span>Upstream 列表</span>
-              <button class="btn btn-sm btn-icon" @click="addUpstream" title="新增 Upstream">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </button>
-            </div>
-            <div class="card-body upstream-body">
-              <div v-if="upstreams.length === 0" class="empty-hint">暂无 Upstream</div>
-              <div v-for="(up, ui) in upstreams" :key="ui" class="upstream-item">
-                <div class="upstream-header" @click="up._open = !up._open">
-                  <div class="flex items-center gap-sm">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: up._open ? 'rotate(90deg)' : '' }"><polyline points="9 18 15 12 9 6"/></svg>
-                    <span class="upstream-name">{{ up.name || 'unnamed' }}</span>
+              <div class="config-list">
+                <!-- nginx.conf special entry -->
+                <div
+                  v-if="hasMainBlocks"
+                  class="config-item config-item-main"
+                  :class="{ active: activeFile === mainFileName }"
+                  @click="selectFile(mainFileName)"
+                >
+                  <div class="config-item-row">
+                    <span class="config-item-name" style="color: var(--warning)">nginx.conf</span>
                   </div>
-                  <button class="btn btn-sm btn-ghost" @click.stop="removeUpstream(ui)" title="删除">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <div class="config-item-meta">
+                    <span class="text-xs" style="color: var(--warning)">不建议在此配置代理</span>
+                  </div>
+                  <button class="btn btn-sm btn-ghost" style="margin-top:4px;font-size:11px;color:var(--danger)" @click.stop="clearMainBlocks">
+                    一键清除代理配置
                   </button>
                 </div>
-                <div v-if="up._open" class="upstream-detail">
-                  <div class="form-group">
-                    <label class="form-label">名称</label>
-                    <input v-model="up.name" placeholder="backend" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">负载策略(upstream strategy)</label>
-                    <BaseSelect v-model="up.strategy" :options="upstreamStrategyOpts" />
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">长连接数(keepalive)</label>
-                    <input v-model="up.keepalive" type="number" placeholder="32" />
-                  </div>
-                  <div class="upstream-servers">
-                    <div class="flex items-center justify-between" style="margin-bottom:4px">
-                      <label class="form-label">后端服务器</label>
-                      <button class="btn btn-sm" @click="addUpstreamServer(up)">+ 添加</button>
-                    </div>
-                    <div v-for="(srv, si) in up.servers" :key="si" class="upstream-srv-row">
-                      <input v-model="srv.addr" placeholder="127.0.0.1:8080" />
-                      <input v-model="srv.weight" placeholder="weight(权重值)" style="width:70px" />
-                      <BaseSelect v-model="srv.state" :options="srvStateOpts" style="width:90px" />
-                      <button class="btn btn-sm btn-ghost" @click="up.servers.splice(si, 1)">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+
+                <!-- conf.d files -->
+                <div
+                  v-for="f in configFiles"
+                  :key="f.name"
+                  class="config-item"
+                  :class="{ active: activeFile === f.name, disabled: !f.enabled }"
+                  @click="selectFile(f.name)"
+                >
+                  <div class="config-item-row">
+                    <span class="config-item-name">{{ f.name }}</span>
+                    <div class="config-item-actions">
+                      <label class="switch" @click.stop>
+                        <input type="checkbox" :checked="f.enabled" @change="toggleFile(f)" /><span class="switch-slider"></span>
+                      </label>
+                      <button class="btn btn-sm btn-ghost" @click.stop="deleteFile(f)" title="删除">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                       </button>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom: Server + Location -->
-        <div class="detail-bottom">
-          <!-- Server List -->
-          <div class="card server-list-card">
-            <div class="card-header">
-              <span>Server 列表</span>
-              <button class="btn btn-sm btn-icon" @click="addServer" title="新增 Server">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </button>
-            </div>
-            <div class="server-list">
-              <div
-                v-for="(srv, si) in servers"
-                :key="si"
-                class="server-item"
-                :class="{ active: activeServer === si }"
-                @click="activeServer = si"
-              >
-                <div class="server-item-name">{{ srv.serverName || 'unnamed' }}:{{ srv.listen }}</div>
-                <div class="flex items-center gap-xs">
-                  <span class="badge" :class="srv.ssl ? 'badge-success' : 'badge-warning'">{{ srv.ssl ? 'SSL' : 'HTTP' }}</span>
-                  <button class="btn btn-sm btn-ghost" @click.stop="removeServer(si)" title="删除">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div v-if="servers.length === 0" class="config-empty">暂无 Server</div>
-            </div>
-          </div>
-
-          <!-- Server Detail -->
-          <div class="card server-detail-card" v-if="currentServer">
-            <div class="card-header">Server 配置</div>
-            <div class="card-body server-detail-body">
-              <!-- Basic -->
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">监听端口(listen)</label>
-                  <input v-model="currentServer.listen" placeholder="80" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">域名(server_name)</label>
-                  <input v-model="currentServer.serverName" placeholder="example.com" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">字符集(charset)</label>
-                  <BaseCombo v-model="currentServer.charset" :options="charsetOpts" placeholder="utf-8" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">根目录(root)</label>
-                  <PathSelector v-model="currentServer.root" type="dir" placeholder="/var/www/html" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">默认索引(index)</label>
-                  <BaseCombo v-model="currentServer.index" :options="indexOpts" placeholder="index.html index.htm" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">访问日志(access_log)</label>
-                  <PathSelector v-model="currentServer.accessLog" type="file" placeholder="/var/log/nginx/access.log" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">错误日志(error_log)</label>
-                  <PathSelector v-model="currentServer.errorLog" type="file" placeholder="/var/log/nginx/error.log" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">最大请求体(client_max_body_size)</label>
-                  <input v-model="currentServer.clientMaxBodySize" placeholder="10m" />
-                </div>
-              </div>
-
-              <!-- SSL -->
-              <div class="section-title">SSL 配置</div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">启用 SSL</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.ssl" /><span class="switch-slider"></span></label>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">HTTP跳转HTTPS(ssl_redirect)</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.sslRedirect" :disabled="currentServer.ssl" /><span class="switch-slider"></span></label>
-                  <span class="text-xs text-tertiary" v-if="currentServer.ssl">仅对HTTP生效, 已启用SSL时无需跳转</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">证书文件(ssl_certificate)</label>
-                  <PathSelector v-model="currentServer.sslCert" type="file" placeholder="/etc/ssl/cert.pem" :disabled="!currentServer.ssl" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">私钥文件(ssl_certificate_key)</label>
-                  <PathSelector v-model="currentServer.sslKey" type="file" placeholder="/etc/ssl/key.pem" :disabled="!currentServer.ssl" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">协议版本(ssl_protocols)</label>
-                  <BaseCombo v-model="currentServer.sslProtocols" :options="sslProtocolsOpts" placeholder="TLSv1.2 TLSv1.3" :disabled="!currentServer.ssl" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">加密套件(ssl_ciphers)</label>
-                  <BaseCombo v-model="currentServer.sslCiphers" :options="sslCiphersOpts" placeholder="HIGH:!aNULL:!MD5" :disabled="!currentServer.ssl" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">会话超时(ssl_session_timeout)</label>
-                  <input v-model="currentServer.sslSessionTimeout" placeholder="1d" :disabled="!currentServer.ssl" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">会话缓存(ssl_session_cache)</label>
-                  <BaseCombo v-model="currentServer.sslSessionCache" :options="sslSessionCacheOpts" placeholder="shared:SSL:10m" :disabled="!currentServer.ssl" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">优先使用服务端算法(ssl_prefer_server_ciphers)</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.sslPreferServerCiphers" :disabled="!currentServer.ssl" /><span class="switch-slider"></span></label>
-                </div>
-              </div>
-
-              <!-- Gzip -->
-              <div class="section-title">Gzip 压缩</div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">启用压缩(gzip)</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.gzip.on" /><span class="switch-slider"></span></label>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Vary头(gzip_vary)</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.gzip.vary" :disabled="!currentServer.gzip.on" /><span class="switch-slider"></span></label>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">最小压缩长度(gzip_min_length)</label>
-                  <input v-model="currentServer.gzip.minLength" placeholder="1024" :disabled="!currentServer.gzip.on" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">压缩级别(gzip_comp_level)</label>
-                  <BaseSelect v-model="currentServer.gzip.compLevel" :options="compLevelOpts" :disabled="!currentServer.gzip.on" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">压缩类型(gzip_types)</label>
-                  <BaseCombo v-model="currentServer.gzip.types" :options="gzipTypesOpts" placeholder="text/plain application/json ..." :disabled="!currentServer.gzip.on" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">代理压缩(gzip_proxied)</label>
-                  <BaseSelect v-model="currentServer.gzip.proxied" :options="gzipProxiedOpts" :disabled="!currentServer.gzip.on" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">缓冲区(gzip_buffers)</label>
-                  <div class="form-row-inline">
-                    <input v-model="currentServer.gzip.buffersNum" placeholder="4" :disabled="!currentServer.gzip.on" />
-                    <span class="form-row-sep">x</span>
-                    <BaseSelect style="width: 100%" v-model="currentServer.gzip.buffersSize" :options="buffersSizeOpts" :disabled="!currentServer.gzip.on" />
+                  <div class="config-item-meta">
+                    <span class="text-xs text-tertiary">{{ f.enabled ? '已启用' : '已停用' }}</span>
+                    <span class="text-xs text-tertiary">{{ f.time }}</span>
                   </div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">最低HTTP版本(gzip_http_version)</label>
-                  <BaseSelect v-model="currentServer.gzip.httpVersion" :options="httpVersionOpts" :disabled="!currentServer.gzip.on" />
-                </div>
-              </div>
 
-              <!-- Proxy Overrides -->
-              <div class="section-title">代理配置（可覆盖全局默认值）</div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">代理缓冲(proxy_buffering)</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.proxyBuffering" /><span class="switch-slider"></span></label>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">字符集(charset)</label>
-                  <BaseCombo v-model="currentServer.charset" :options="charsetOpts" placeholder="utf-8（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">代理连接超时(proxy_connect_timeout)</label>
-                  <input v-model="currentServer.proxyConnectTimeout" placeholder="30s（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">代理读取超时(proxy_read_timeout)</label>
-                  <input v-model="currentServer.proxyReadTimeout" placeholder="60s（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">代理发送超时(proxy_send_timeout)</label>
-                  <input v-model="currentServer.proxySendTimeout" placeholder="60s（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">代理缓冲区(proxy_buffer_size)</label>
-                  <input v-model="currentServer.proxyBufferSize" placeholder="4k（留空继承全局）" />
-                </div>
+                <div v-if="!hasMainBlocks && configFiles.length === 0" class="config-empty">暂无配置文件</div>
               </div>
+            </div>
 
-              <!-- HTTP Overrides -->
-              <div class="section-title">HTTP 配置（可覆盖全局默认值）</div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">零拷贝传输(sendfile)</label>
-                  <BaseSelect v-model="currentServer.sendfile" :options="onOffOpts" placeholder="留空继承全局" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">TCP推送(tcp_nopush)</label>
-                  <BaseSelect v-model="currentServer.tcpNopush" :options="onOffOpts" placeholder="留空继承全局" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">TCP无延迟(tcp_nodelay)</label>
-                  <BaseSelect v-model="currentServer.tcpNodelay" :options="onOffOpts" placeholder="留空继承全局" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">保持连接超时(keepalive_timeout)</label>
-                  <input v-model="currentServer.keepaliveTimeout" placeholder="65（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">最大请求数(keepalive_requests)</label>
-                  <input v-model="currentServer.keepaliveRequests" type="number" placeholder="1000（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">请求体超时(client_body_timeout)</label>
-                  <input v-model="currentServer.clientBodyTimeout" type="number" placeholder="60（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">请求头超时(client_header_timeout)</label>
-                  <input v-model="currentServer.clientHeaderTimeout" type="number" placeholder="60（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">哈希表大小(types_hash_max_size)</label>
-                  <input v-model="currentServer.typesHashMaxSize" type="number" placeholder="2048（留空继承全局）" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">版本信息(server_tokens)</label>
-                  <BaseSelect v-model="currentServer.serverTokens" :options="onOffOpts" placeholder="留空继承全局" />
-                </div>
-              </div>
-
-              <!-- Extra -->
-              <div class="section-title">其他配置</div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">目录浏览(autoindex)</label>
-                  <label class="switch"><input type="checkbox" v-model="currentServer.autoindex" /><span class="switch-slider"></span></label>
-                </div>
-              </div>
-
-              <!-- Response Headers -->
-              <div class="section-title">
-                <span>响应头(add_header)</span>
-                <button class="btn btn-sm btn-icon" @click="addResponseHeader" title="新增响应头">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                </button>
-              </div>
-              <div v-if="currentServer.addHeaders.length === 0" class="empty-hint">暂无自定义响应头</div>
-              <div v-for="(hdr, hi) in currentServer.addHeaders" :key="hi" class="upstream-srv-row" style="margin-bottom:4px">
-                <BaseCombo v-model="currentServer.addHeaders[hi]" :options="addHeaderOpts" placeholder="X-Frame-Options SAMEORIGIN" style="flex:1" />
-                <button class="btn btn-sm btn-ghost" @click="currentServer.addHeaders.splice(hi, 1)">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-
-              <!-- Locations -->
-              <div class="section-title">
-                <span>Location 列表</span>
-                <button class="btn btn-sm btn-icon" @click="addLocation" title="新增 Location">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                </button>
-              </div>
-              <div class="location-list">
-                <div v-if="currentServer.locations.length === 0" class="empty-hint">暂无 Location</div>
-                <div v-for="(loc, li) in currentServer.locations" :key="li" class="location-item">
-                  <div class="location-header" @click="loc._open = !loc._open">
-                    <div class="flex items-center gap-sm">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: loc._open ? 'rotate(90deg)' : '' }"><polyline points="9 18 15 12 9 6"/></svg>
-                      <span class="location-path">{{ loc.path || '/' }}</span>
-                      <span class="badge" :class="locTypeBadge(loc.type)">{{ loc.type }}</span>
-                    </div>
-                    <button class="btn btn-sm btn-ghost" @click.stop="removeLocation(li)" title="删除">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <!-- Right: Detail -->
+            <div class="config-detail-panel">
+              <!-- Top: Upstream (full width) -->
+              <div class="detail-top">
+                <!-- Upstream -->
+                <div class="card upstream-card-full">
+                  <div class="card-header">
+                    <span>Upstream 列表</span>
+                    <button class="btn btn-sm btn-icon" @click="addUpstream" title="新增 Upstream">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     </button>
                   </div>
-                  <div v-if="loc._open" class="location-detail">
+                  <div class="card-body upstream-body">
+                    <div v-if="upstreams.length === 0" class="empty-hint">暂无 Upstream</div>
+                    <div v-for="(up, ui) in upstreams" :key="ui" class="upstream-item">
+                      <div class="upstream-header" @click="up._open = !up._open">
+                        <div class="flex items-center gap-sm">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: up._open ? 'rotate(90deg)' : '' }"><polyline points="9 18 15 12 9 6"/></svg>
+                          <span class="upstream-name">{{ up.name || 'unnamed' }}</span>
+                        </div>
+                        <button class="btn btn-sm btn-ghost" @click.stop="removeUpstream(ui)" title="删除">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                      </div>
+                      <div v-if="up._open" class="upstream-detail">
+                        <div class="form-group">
+                          <label class="form-label">名称</label>
+                          <input v-model="up.name" placeholder="backend" />
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">负载策略(upstream strategy)</label>
+                          <BaseSelect v-model="up.strategy" :options="upstreamStrategyOpts" />
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">长连接数(keepalive)</label>
+                          <input v-model="up.keepalive" type="number" placeholder="32" />
+                        </div>
+                        <div class="upstream-servers">
+                          <div class="flex items-center justify-between" style="margin-bottom:4px">
+                            <label class="form-label">后端服务器</label>
+                            <button class="btn btn-sm" @click="addUpstreamServer(up)">+ 添加</button>
+                          </div>
+                          <div v-for="(srv, si) in up.servers" :key="si" class="upstream-srv-row">
+                            <input v-model="srv.addr" placeholder="127.0.0.1:8080" />
+                            <input v-model="srv.weight" placeholder="weight(权重值)" style="width:70px" />
+                            <BaseSelect v-model="srv.state" :options="srvStateOpts" style="width:90px" />
+                            <button class="btn btn-sm btn-ghost" @click="up.servers.splice(si, 1)">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom: Server + Location -->
+              <div class="detail-bottom">
+                <!-- Server List -->
+                <div class="card server-list-card">
+                  <div class="card-header">
+                    <span>Server 列表</span>
+                    <button class="btn btn-sm btn-icon" @click="addServer" title="新增 Server">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                  </div>
+                  <div class="server-list">
+                    <div
+                      v-for="(srv, si) in servers"
+                      :key="si"
+                      class="server-item"
+                      :class="{ active: activeServer === si }"
+                      @click="activeServer = si"
+                    >
+                      <div class="server-item-name">{{ srv.serverName || 'unnamed' }}:{{ srv.listen }}</div>
+                      <div class="flex items-center gap-xs">
+                        <span class="badge" :class="srv.ssl ? 'badge-success' : 'badge-warning'">{{ srv.ssl ? 'SSL' : 'HTTP' }}</span>
+                        <button class="btn btn-sm btn-ghost" @click.stop="removeServer(si)" title="删除">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="servers.length === 0" class="config-empty">暂无 Server</div>
+                  </div>
+                </div>
+
+                <!-- Server Detail -->
+                <div class="card server-detail-card" v-if="currentServer">
+                  <div class="card-header">Server 配置</div>
+                  <div class="card-body server-detail-body">
+                    <!-- Basic -->
                     <div class="form-grid">
                       <div class="form-group">
-                        <label class="form-label">路径(path)</label>
-                        <input v-model="loc.path" placeholder="/" />
+                        <label class="form-label">监听端口(listen)</label>
+                        <input v-model="currentServer.listen" placeholder="80" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">类型</label>
-                        <BaseSelect v-model="loc.type" :options="locTypeOpts" />
+                        <label class="form-label">域名(server_name)</label>
+                        <input v-model="currentServer.serverName" placeholder="example.com" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">根目录/别名(root/alias)</label>
-                        <PathSelector v-model="loc.root" type="dir" placeholder="/var/www/html" />
-                      </div>
-                      <div class="form-group" style="grid-column: 1 / -1">
-                        <label class="form-label">代理目标(proxy_pass)</label>
-                        <BaseCombo v-model="loc.proxyPass" :options="proxyPassOpts" placeholder="http://127.0.0.1:3000 或选择 Upstream" />
+                        <label class="form-label">字符集(charset)</label>
+                        <BaseCombo v-model="currentServer.charset" :options="charsetOpts" placeholder="utf-8" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">文件尝试(try_files)</label>
-                        <input v-model="loc.tryFiles" placeholder="$uri $uri/ /index.html" />
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">返回/重定向(return)</label>
-                        <input v-model="loc.returnCode" placeholder="301 https://..." />
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">URL重写(rewrite)</label>
-                        <input v-model="loc.rewrite" placeholder="^/old/(.*)$ /new/$1 permanent" />
+                        <label class="form-label">根目录(root)</label>
+                        <PathSelector v-model="currentServer.root" type="dir" placeholder="/var/www/html" />
                       </div>
                       <div class="form-group">
                         <label class="form-label">默认索引(index)</label>
-                        <input v-model="loc.index" placeholder="index.html" />
+                        <BaseCombo v-model="currentServer.index" :options="indexOpts" placeholder="index.html index.htm" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">缓存过期(expires)</label>
-                        <input v-model="loc.expires" placeholder="30d" />
+                        <label class="form-label">访问日志(access_log)</label>
+                        <PathSelector v-model="currentServer.accessLog" type="file" placeholder="/var/log/nginx/access.log" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">拒绝访问(deny)</label>
-                        <input v-model="loc.deny" placeholder="all" />
+                        <label class="form-label">错误日志(error_log)</label>
+                        <PathSelector v-model="currentServer.errorLog" type="file" placeholder="/var/log/nginx/error.log" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">允许访问(allow)</label>
-                        <input v-model="loc.allow" placeholder="192.168.1.0/24" />
+                        <label class="form-label">最大请求体(client_max_body_size)</label>
+                        <input v-model="currentServer.clientMaxBodySize" placeholder="10m" />
                       </div>
                     </div>
-                    <!-- Proxy Headers -->
-                    <div class="section-title" style="font-size:11px;margin-top:8px">代理 Header</div>
+
+                    <!-- SSL -->
+                    <div class="section-title">SSL 配置</div>
                     <div class="form-grid">
                       <div class="form-group">
-                        <label class="form-label">代理Host头(proxy_set_header Host)</label>
-                        <input v-model="loc.proxyHost" placeholder="$host" />
+                        <label class="form-label">启用 SSL</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.ssl" /><span class="switch-slider"></span></label>
                       </div>
                       <div class="form-group">
-                        <label class="form-label">真实IP头(proxy_set_header X-Real-IP)</label>
-                        <input v-model="loc.proxyRealIp" placeholder="$remote_addr" />
+                        <label class="form-label">HTTP跳转HTTPS(ssl_redirect)</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.sslRedirect" :disabled="currentServer.ssl" /><span class="switch-slider"></span></label>
+                        <span class="text-xs text-tertiary" v-if="currentServer.ssl">仅对HTTP生效, 已启用SSL时无需跳转</span>
                       </div>
                       <div class="form-group">
-                        <label class="form-label">转发IP链(proxy_set_header X-Forwarded-For)</label>
-                        <input v-model="loc.proxyXff" placeholder="$proxy_add_x_forwarded_for" />
+                        <label class="form-label">证书文件(ssl_certificate)</label>
+                        <PathSelector v-model="currentServer.sslCert" type="file" placeholder="/etc/ssl/cert.pem" :disabled="!currentServer.ssl" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">转发协议头(proxy_set_header X-Forwarded-Proto)</label>
-                        <input v-model="loc.proxyProto" placeholder="$scheme" />
+                        <label class="form-label">私钥文件(ssl_certificate_key)</label>
+                        <PathSelector v-model="currentServer.sslKey" type="file" placeholder="/etc/ssl/key.pem" :disabled="!currentServer.ssl" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">协议版本(ssl_protocols)</label>
+                        <BaseCombo v-model="currentServer.sslProtocols" :options="sslProtocolsOpts" placeholder="TLSv1.2 TLSv1.3" :disabled="!currentServer.ssl" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">加密套件(ssl_ciphers)</label>
+                        <BaseCombo v-model="currentServer.sslCiphers" :options="sslCiphersOpts" placeholder="HIGH:!aNULL:!MD5" :disabled="!currentServer.ssl" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">会话超时(ssl_session_timeout)</label>
+                        <input v-model="currentServer.sslSessionTimeout" placeholder="1d" :disabled="!currentServer.ssl" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">会话缓存(ssl_session_cache)</label>
+                        <BaseCombo v-model="currentServer.sslSessionCache" :options="sslSessionCacheOpts" placeholder="shared:SSL:10m" :disabled="!currentServer.ssl" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">优先使用服务端算法(ssl_prefer_server_ciphers)</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.sslPreferServerCiphers" :disabled="!currentServer.ssl" /><span class="switch-slider"></span></label>
                       </div>
                     </div>
+
+                    <!-- Gzip -->
+                    <div class="section-title">Gzip 压缩</div>
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label class="form-label">启用压缩(gzip)</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.gzip.on" /><span class="switch-slider"></span></label>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Vary头(gzip_vary)</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.gzip.vary" :disabled="!currentServer.gzip.on" /><span class="switch-slider"></span></label>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">最小压缩长度(gzip_min_length)</label>
+                        <input v-model="currentServer.gzip.minLength" placeholder="1024" :disabled="!currentServer.gzip.on" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">压缩级别(gzip_comp_level)</label>
+                        <BaseSelect v-model="currentServer.gzip.compLevel" :options="compLevelOpts" :disabled="!currentServer.gzip.on" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">压缩类型(gzip_types)</label>
+                        <BaseCombo v-model="currentServer.gzip.types" :options="gzipTypesOpts" placeholder="text/plain application/json ..." :disabled="!currentServer.gzip.on" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">代理压缩(gzip_proxied)</label>
+                        <BaseSelect v-model="currentServer.gzip.proxied" :options="gzipProxiedOpts" :disabled="!currentServer.gzip.on" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">缓冲区(gzip_buffers)</label>
+                        <div class="form-row-inline">
+                          <input v-model="currentServer.gzip.buffersNum" placeholder="4" :disabled="!currentServer.gzip.on" />
+                          <span class="form-row-sep">x</span>
+                          <BaseSelect style="width: 100%" v-model="currentServer.gzip.buffersSize" :options="buffersSizeOpts" :disabled="!currentServer.gzip.on" />
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">最低HTTP版本(gzip_http_version)</label>
+                        <BaseSelect v-model="currentServer.gzip.httpVersion" :options="httpVersionOpts" :disabled="!currentServer.gzip.on" />
+                      </div>
+                    </div>
+
+                    <!-- Proxy Overrides -->
+                    <div class="section-title">代理配置（可覆盖全局默认值）</div>
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label class="form-label">代理缓冲(proxy_buffering)</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.proxyBuffering" /><span class="switch-slider"></span></label>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">字符集(charset)</label>
+                        <BaseCombo v-model="currentServer.charset" :options="charsetOpts" placeholder="utf-8（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">代理连接超时(proxy_connect_timeout)</label>
+                        <input v-model="currentServer.proxyConnectTimeout" placeholder="30s（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">代理读取超时(proxy_read_timeout)</label>
+                        <input v-model="currentServer.proxyReadTimeout" placeholder="60s（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">代理发送超时(proxy_send_timeout)</label>
+                        <input v-model="currentServer.proxySendTimeout" placeholder="60s（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">代理缓冲区(proxy_buffer_size)</label>
+                        <input v-model="currentServer.proxyBufferSize" placeholder="4k（留空继承全局）" />
+                      </div>
+                    </div>
+
+                    <!-- HTTP Overrides -->
+                    <div class="section-title">HTTP 配置（可覆盖全局默认值）</div>
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label class="form-label">零拷贝传输(sendfile)</label>
+                        <BaseSelect v-model="currentServer.sendfile" :options="onOffOpts" placeholder="留空继承全局" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">TCP推送(tcp_nopush)</label>
+                        <BaseSelect v-model="currentServer.tcpNopush" :options="onOffOpts" placeholder="留空继承全局" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">TCP无延迟(tcp_nodelay)</label>
+                        <BaseSelect v-model="currentServer.tcpNodelay" :options="onOffOpts" placeholder="留空继承全局" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">保持连接超时(keepalive_timeout)</label>
+                        <input v-model="currentServer.keepaliveTimeout" placeholder="65（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">最大请求数(keepalive_requests)</label>
+                        <input v-model="currentServer.keepaliveRequests" type="number" placeholder="1000（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">请求体超时(client_body_timeout)</label>
+                        <input v-model="currentServer.clientBodyTimeout" type="number" placeholder="60（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">请求头超时(client_header_timeout)</label>
+                        <input v-model="currentServer.clientHeaderTimeout" type="number" placeholder="60（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">哈希表大小(types_hash_max_size)</label>
+                        <input v-model="currentServer.typesHashMaxSize" type="number" placeholder="2048（留空继承全局）" />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">版本信息(server_tokens)</label>
+                        <BaseSelect v-model="currentServer.serverTokens" :options="onOffOpts" placeholder="留空继承全局" />
+                      </div>
+                    </div>
+
+                    <!-- Extra -->
+                    <div class="section-title">其他配置</div>
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label class="form-label">目录浏览(autoindex)</label>
+                        <label class="switch"><input type="checkbox" v-model="currentServer.autoindex" /><span class="switch-slider"></span></label>
+                      </div>
+                    </div>
+
+                    <!-- Response Headers -->
+                    <div class="section-title">
+                      <span>响应头(add_header)</span>
+                      <button class="btn btn-sm btn-icon" @click="addResponseHeader" title="新增响应头">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                    </div>
+                    <div v-if="currentServer.addHeaders.length === 0" class="empty-hint">暂无自定义响应头</div>
+                    <div v-for="(hdr, hi) in currentServer.addHeaders" :key="hi" class="upstream-srv-row" style="margin-bottom:4px">
+                      <BaseCombo v-model="currentServer.addHeaders[hi]" :options="addHeaderOpts" placeholder="X-Frame-Options SAMEORIGIN" style="flex:1" />
+                      <button class="btn btn-sm btn-ghost" @click="currentServer.addHeaders.splice(hi, 1)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+
+                    <!-- Locations -->
+                    <div class="section-title">
+                      <span>Location 列表</span>
+                      <button class="btn btn-sm btn-icon" @click="addLocation" title="新增 Location">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                    </div>
+                    <div class="location-list">
+                      <div v-if="currentServer.locations.length === 0" class="empty-hint">暂无 Location</div>
+                      <div v-for="(loc, li) in currentServer.locations" :key="li" class="location-item">
+                        <div class="location-header" @click="loc._open = !loc._open">
+                          <div class="flex items-center gap-sm">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: loc._open ? 'rotate(90deg)' : '' }"><polyline points="9 18 15 12 9 6"/></svg>
+                            <span class="location-path">{{ loc.path || '/' }}</span>
+                            <span class="badge" :class="locTypeBadge(loc.type)">{{ loc.type }}</span>
+                          </div>
+                          <button class="btn btn-sm btn-ghost" @click.stop="removeLocation(li)" title="删除">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          </button>
+                        </div>
+                        <div v-if="loc._open" class="location-detail">
+                          <div class="form-grid">
+                            <div class="form-group">
+                              <label class="form-label">路径(path)</label>
+                              <input v-model="loc.path" placeholder="/" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">类型</label>
+                              <BaseSelect v-model="loc.type" :options="locTypeOpts" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">根目录/别名(root/alias)</label>
+                              <PathSelector v-model="loc.root" type="dir" placeholder="/var/www/html" />
+                            </div>
+                            <div class="form-group" style="grid-column: 1 / -1">
+                              <label class="form-label">代理目标(proxy_pass)</label>
+                              <BaseCombo v-model="loc.proxyPass" :options="proxyPassOpts" placeholder="http://127.0.0.1:3000 或选择 Upstream" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">文件尝试(try_files)</label>
+                              <input v-model="loc.tryFiles" placeholder="$uri $uri/ /index.html" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">返回/重定向(return)</label>
+                              <input v-model="loc.returnCode" placeholder="301 https://..." />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">URL重写(rewrite)</label>
+                              <input v-model="loc.rewrite" placeholder="^/old/(.*)$ /new/$1 permanent" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">默认索引(index)</label>
+                              <input v-model="loc.index" placeholder="index.html" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">缓存过期(expires)</label>
+                              <input v-model="loc.expires" placeholder="30d" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">拒绝访问(deny)</label>
+                              <input v-model="loc.deny" placeholder="all" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">允许访问(allow)</label>
+                              <input v-model="loc.allow" placeholder="192.168.1.0/24" />
+                            </div>
+                          </div>
+                          <!-- Proxy Headers -->
+                          <div class="section-title" style="font-size:11px;margin-top:8px">代理 Header</div>
+                          <div class="form-grid">
+                            <div class="form-group">
+                              <label class="form-label">代理Host头(proxy_set_header Host)</label>
+                              <input v-model="loc.proxyHost" placeholder="$host" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">真实IP头(proxy_set_header X-Real-IP)</label>
+                              <input v-model="loc.proxyRealIp" placeholder="$remote_addr" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">转发IP链(proxy_set_header X-Forwarded-For)</label>
+                              <input v-model="loc.proxyXff" placeholder="$proxy_add_x_forwarded_for" />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">转发协议头(proxy_set_header X-Forwarded-Proto)</label>
+                              <input v-model="loc.proxyProto" placeholder="$scheme" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="card server-detail-card server-empty-card">
+                  <div class="card-body flex items-center justify-center" style="height:100%">
+                    <span class="text-tertiary">请从左侧选择一个 Server</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <div v-else class="card server-detail-card server-empty-card">
-            <div class="card-body flex items-center justify-center" style="height:100%">
-              <span class="text-tertiary">请从左侧选择一个 Server</span>
-            </div>
+        </div>
+        <!-- Code Mode: Editor -->
+        <div v-show="mode === 'code'" class="code-editor-panel">
+          <EditorToolbar
+              :file-name="rawFileName"
+              :status="rawSaveStatus"
+              @reload="fetchRawContent"
+              @save="saveRawContent"
+          />
+          <div class="editor-wrapper">
+            <MonacoEditor
+                v-model="rawContent"
+                language="nginx"
+                @save="saveRawContent"
+            />
           </div>
         </div>
       </div>
-    <!-- Code Mode: Editor -->
-    <div v-show="mode === 'code'" class="code-editor-panel">
-      <EditorToolbar
-        :file-name="rawFileName"
-        :status="rawSaveStatus"
-        @reload="fetchRawContent"
-        @save="saveRawContent"
-      />
-      <div class="editor-wrapper">
-        <MonacoEditor
-          v-model="rawContent"
-          language="nginx"
-          @save="saveRawContent"
-        />
+      <!-- Mode Switcher -->
+      <div class="mode-bar">
+        <div class="mode-tabs">
+          <button class="mode-tab" :class="{ active: mode === 'ui' }" @click="switchMode('ui')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            UI 模式
+          </button>
+          <button class="mode-tab" :class="{ active: mode === 'code' }" @click="switchMode('code')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Code 模式
+          </button>
+        </div>
       </div>
-    </div>
-    </div>
 
-    <!-- Mode Switcher -->
-    <div class="mode-bar">
-      <div class="mode-tabs">
-        <button class="mode-tab" :class="{ active: mode === 'ui' }" @click="switchMode('ui')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-          UI 模式
-        </button>
-        <button class="mode-tab" :class="{ active: mode === 'code' }" @click="switchMode('code')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          Code 模式
-        </button>
-      </div>
-    </div>
-
-    <LogPanel :logs="logs" :status="saveStatus" @clear="logs.splice(0)" />
-    </div>
-    </div>
+      <LogPanel :logs="logs" :status="saveStatus" @clear="logs.splice(0)" />
     </div>
     <!-- New File Dialog -->
     <div v-if="showNewFileDialog" class="modal-overlay" @click.self="showNewFileDialog = false">
@@ -994,7 +993,7 @@ async function saveFileBlocks() {
       saveStatus.message = ''
       saveStatus.time = new Date()
       addLog(true, '[' + activeFile.value + '] 配置已保存')
-      await fetchConfig()
+      // await fetchConfig()
     } else {
       saveStatus.state = 'error'
       saveStatus.message = json.message
@@ -1054,7 +1053,7 @@ async function toggleFile(f) {
     if (json.code === 200) {
       addLog(true, f.name + ' 状态已切换')
       const wasActive = activeFile.value === f.name
-      await fetchConfig()
+      // await fetchConfig()
       if (wasActive) {
         // Select the renamed file
         const newName = f.name.endsWith('.conf')
@@ -1081,7 +1080,7 @@ async function deleteFile(f) {
     if (json.code === 200) {
       addLog(true, f.name + ' 已删除')
       if (activeFile.value === f.name) activeFile.value = ''
-      await fetchConfig()
+      // await fetchConfig()
     } else {
       addLog(false, '删除失败: ' + json.message)
     }

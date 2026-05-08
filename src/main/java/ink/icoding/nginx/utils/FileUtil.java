@@ -1,11 +1,18 @@
 package ink.icoding.nginx.utils;
 
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.SftpATTRS;
+import com.jcraft.jsch.SftpException;
+import ink.icoding.nginx.config.SshSessionManager;
 import ink.icoding.nginx.utils.CommandUtil.CommandResult;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -26,7 +33,7 @@ public final class FileUtil {
     }
 
     // ==================== 读取 ====================
-    static Map<String, String> fileCache = new HashMap<>();
+    static Map<String, String> fileCache = new ConcurrentHashMap<>();
     public static String readFile(String path) {
         if (fileCache.containsKey(path)) {
             return fileCache.get(path);
@@ -34,11 +41,15 @@ public final class FileUtil {
         synchronized (FileUtil.class) {
              // 读取文件时加锁，避免 SSH 模式下的并发问题（如多个线程同时写入导致读取失败）
             if (CommandUtil.isSshEnabled()) {
-                CommandResult r = CommandUtil.execute("cat " + path);
-                if (!r.isSuccess()) {
-                    throw new RuntimeException("读取文件失败: " + path);
-                }
-                fileCache.put(path, r.getStdout());
+                String content = withSftp("读取文件: " + path, channel -> {
+                    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        channel.get(path, out);
+                        return out.toString(StandardCharsets.UTF_8);
+                    } catch (IOException e) {
+                        throw new RuntimeException("读取文件失败: " + path, e);
+                    }
+                });
+                fileCache.put(path, content);
             }else{
                 try {
                     fileCache.put(path, Files.readString(Path.of(path), StandardCharsets.UTF_8));
@@ -54,14 +65,13 @@ public final class FileUtil {
 
     public static void writeFile(String path, String content) {
         if (CommandUtil.isSshEnabled()) {
-            // 用 heredoc 写入，避免转义问题
             synchronized (FileUtil.class) {
-                // SSH 模式下的写入在某些环境（如 BusyBox）可能存在并发问题，添加同步锁
-                String escaped = content.replace("\\", "\\\\").replace("'", "'\\''");
-                CommandResult r = CommandUtil.execute("cat > " + path + " << 'NGINX_GUI_EOF'\n" + content + "\nNGINX_GUI_EOF");
-                if (!r.isSuccess()) {
-                    throw new RuntimeException("写入文件失败: " + path + ": " + r.getStderr());
-                }
+                createDirectories(parentOf(path));
+                withSftp("写入文件: " + path, channel -> {
+                    byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+                    channel.put(new ByteArrayInputStream(bytes), path, ChannelSftp.OVERWRITE);
+                    return null;
+                });
                 fileCache.put(path, content);
                 return;
             }
@@ -78,27 +88,27 @@ public final class FileUtil {
 
     public static boolean exists(String path) {
         if (CommandUtil.isSshEnabled()) {
-            synchronized (FileUtil.class) {
-                // SSH 模式下的 test -e 在某些环境（如 BusyBox）可能存在并发问题，添加同步锁
-                return CommandUtil.execute("test -e " + path).isSuccess();
-            }
+            return withSftp("检查存在: " + path, channel -> statOrNull(channel, path) != null);
         }
         return Files.exists(Path.of(path));
     }
 
     public static boolean isRegularFile(String path) {
         if (CommandUtil.isSshEnabled()) {
-            synchronized (FileUtil.class) {
-                // SSH 模式下的 test -f 在某些环境（如 BusyBox）可能存在并发问题，添加同步锁
-                return CommandUtil.execute("test -f " + path).isSuccess();
-            }
+            return withSftp("检查普通文件: " + path, channel -> {
+                SftpATTRS attrs = statOrNull(channel, path);
+                return attrs != null && !attrs.isDir();
+            });
         }
         return Files.isRegularFile(Path.of(path));
     }
 
     public static boolean isDirectory(String path) {
         if (CommandUtil.isSshEnabled()) {
-            return CommandUtil.execute("test -d " + path).isSuccess();
+            return withSftp("检查目录: " + path, channel -> {
+                SftpATTRS attrs = statOrNull(channel, path);
+                return attrs != null && attrs.isDir();
+            });
         }
         return Files.isDirectory(Path.of(path));
     }
@@ -107,10 +117,10 @@ public final class FileUtil {
 
     public static void createDirectories(String path) {
         if (CommandUtil.isSshEnabled()) {
-            CommandResult r = CommandUtil.execute("mkdir -p " + path);
-            if (!r.isSuccess()) {
-                throw new RuntimeException("创建目录失败: " + path);
-            }
+            withSftp("创建目录: " + path, channel -> {
+                createDirectoriesRemote(channel, path);
+                return null;
+            });
             return;
         }
         try {
@@ -124,8 +134,19 @@ public final class FileUtil {
 
     public static boolean deleteIfExists(String path) {
         if (CommandUtil.isSshEnabled()) {
-            CommandUtil.execute("rm -f " + path);
-            return true;
+            invalidateCache(path);
+            return withSftp("删除路径: " + path, channel -> {
+                SftpATTRS attrs = statOrNull(channel, path);
+                if (attrs == null) {
+                    return false;
+                }
+                if (attrs.isDir()) {
+                    channel.rmdir(path);
+                } else {
+                    channel.rm(path);
+                }
+                return true;
+            });
         }
         try {
             return Files.deleteIfExists(Path.of(path));
@@ -157,11 +178,28 @@ public final class FileUtil {
 
     public static void move(String source, String target, boolean replaceExisting) {
         if (CommandUtil.isSshEnabled()) {
-            String flag = replaceExisting ? "-f" : "-n";
-            CommandResult r = CommandUtil.execute("mv " + flag + " " + source + " " + target);
-            if (!r.isSuccess()) {
-                throw new RuntimeException("移动文件失败: " + source + " → " + target);
-            }
+            withSftp("移动路径: " + source + " → " + target, channel -> {
+                SftpATTRS sourceAttrs = statOrNull(channel, source);
+                if (sourceAttrs == null) {
+                    throw new RuntimeException("移动文件失败: 源文件不存在: " + source);
+                }
+                SftpATTRS targetAttrs = statOrNull(channel, target);
+                if (targetAttrs != null) {
+                    if (!replaceExisting) {
+                        throw new RuntimeException("移动文件失败: 目标已存在: " + target);
+                    }
+                    if (targetAttrs.isDir()) {
+                        channel.rmdir(target);
+                    } else {
+                        channel.rm(target);
+                    }
+                } else {
+                    createDirectoriesRemote(channel, parentOf(target));
+                }
+                channel.rename(source, target);
+                return null;
+            });
+            invalidateCache(source, target);
             return;
         }
         try {
@@ -209,33 +247,26 @@ public final class FileUtil {
     }
 
     private static List<Map<String, Object>> listDirectoryRemote(String dirPath) {
-        List<Map<String, Object>> items = new ArrayList<>();
-        CommandResult r = CommandUtil.execute("LC_ALL=C ls -la " + dirPath);
-        if (!r.isSuccess()) return items;
+        List<Map<String, Object>> items = withSftp("列出目录: " + dirPath, channel -> {
+            List<Map<String, Object>> result = new ArrayList<>();
+            @SuppressWarnings("unchecked")
+            Vector<ChannelSftp.LsEntry> entries = channel.ls(dirPath);
+            for (ChannelSftp.LsEntry entry : entries) {
+                String name = entry.getFilename();
+                if (name.equals(".") || name.equals("..") || name.startsWith(".")) continue;
 
-        for (String line : r.getStdout().split("\n")) {
-            if (line.isEmpty() || line.startsWith("total") || !line.matches("[d\\-].*")) continue;
-
-            boolean isDir = line.startsWith("d");
-            Matcher m = LS_DATE_PATTERN.matcher(line);
-            if (!m.find()) continue;
-            String name = line.substring(m.end());
-            if (name.equals(".") || name.equals("..") || name.startsWith(".")) continue;
-
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("name", name);
-            item.put("dir", isDir);
-
-            String meta = line.substring(0, m.start());
-            String[] parts = meta.trim().split("\\s+");
-            if (parts.length >= 5 && !isDir) {
-                try {
-                    item.put("size", Long.parseLong(parts[4]));
-                } catch (NumberFormatException ignored) {
+                SftpATTRS attrs = entry.getAttrs();
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", name);
+                item.put("dir", attrs.isDir());
+                item.put("time", attrs.getMTime() * 1000L);
+                if (!attrs.isDir()) {
+                    item.put("size", attrs.getSize());
                 }
+                result.add(item);
             }
-            items.add(item);
-        }
+            return result;
+        });
         items.sort((a, b) -> {
             boolean aDir = (Boolean) a.get("dir");
             boolean bDir = (Boolean) b.get("dir");
@@ -243,5 +274,74 @@ public final class FileUtil {
             return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
         });
         return items;
+    }
+
+    private static <T> T withSftp(String action, SshSessionManager.SftpCallback<T> callback) {
+        SshSessionManager manager = CommandUtil.getSshSessionManager();
+        if (manager == null) {
+            throw new IllegalStateException("SSH 未启用，无法执行 SFTP 操作: " + action);
+        }
+        return manager.executeSftp(action, callback);
+    }
+
+    private static SftpATTRS statOrNull(ChannelSftp channel, String path) throws SftpException {
+        try {
+            return channel.stat(path);
+        } catch (SftpException e) {
+            if (e.id == ChannelSftp.SSH_FX_NO_SUCH_FILE) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    private static void createDirectoriesRemote(ChannelSftp channel, String path) throws SftpException {
+        String normalized = normalizeRemotePath(path);
+        if (normalized.isEmpty() || ".".equals(normalized) || "/".equals(normalized)) {
+            return;
+        }
+
+        boolean absolute = normalized.startsWith("/");
+        String[] parts = normalized.split("/+");
+        StringBuilder current = new StringBuilder();
+        if (absolute) {
+            current.append('/');
+        }
+
+        for (String part : parts) {
+            if (part == null || part.isBlank()) continue;
+            if (current.length() > 0 && current.charAt(current.length() - 1) != '/') {
+                current.append('/');
+            }
+            current.append(part);
+            String currentPath = current.toString();
+            SftpATTRS attrs = statOrNull(channel, currentPath);
+            if (attrs == null) {
+                channel.mkdir(currentPath);
+            } else if (!attrs.isDir()) {
+                throw new RuntimeException("创建目录失败，存在同名文件: " + currentPath);
+            }
+        }
+    }
+
+    private static String normalizeRemotePath(String path) {
+        return path == null ? "" : path.replace('\\', '/').trim();
+    }
+
+    private static String parentOf(String path) {
+        if (path == null || path.isBlank()) return ".";
+        String normalized = normalizeRemotePath(path);
+        int lastSlash = normalized.lastIndexOf('/');
+        if (lastSlash < 0) return ".";
+        if (lastSlash == 0) return "/";
+        return normalized.substring(0, lastSlash);
+    }
+
+    private static void invalidateCache(String... paths) {
+        for (String path : paths) {
+            if (path != null) {
+                fileCache.remove(path);
+            }
+        }
     }
 }

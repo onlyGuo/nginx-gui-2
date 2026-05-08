@@ -18,6 +18,8 @@ public class SshSessionManager {
 
     private final SshConfig config;
     private Session session;
+    private ChannelSftp sftpChannel;
+    private volatile long sessionConnectedAt;
     private final Object lock = new Object();
     private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "ssh-command-worker");
@@ -70,10 +72,15 @@ public class SshSessionManager {
     public Session getSession() throws JSchException {
         synchronized (lock) {
             if (session != null && session.isConnected()) {
+                log.info("复用 SSH 连接: {}@{}:{}, connectedAt={}, ageMs={}",
+                        config.getUsername(), config.getHost(), config.getPort(),
+                        sessionConnectedAt,
+                        sessionConnectedAt > 0 ? (System.currentTimeMillis() - sessionConnectedAt) : -1);
                 return session;
             }
             disconnect();
             session = createSession();
+            sessionConnectedAt = System.currentTimeMillis();
             log.info("SSH 连接已建立: {}@{}:{}", config.getUsername(), config.getHost(), config.getPort());
             return session;
         }
@@ -81,38 +88,113 @@ public class SshSessionManager {
 
     private void disconnect() {
         synchronized (lock) {
+            disconnectSftpChannelLocked();
             if (session != null) {
                 try {
                     session.disconnect();
                 } catch (Exception ignored) {
                 }
                 session = null;
+                sessionConnectedAt = 0L;
             }
         }
     }
 
+    private ChannelSftp getSftpChannelLocked() throws JSchException {
+        if (sftpChannel != null && sftpChannel.isConnected()) {
+            return sftpChannel;
+        }
+        Session sess = getSession();
+        ChannelSftp channel = (ChannelSftp) sess.openChannel("sftp");
+        channel.connect(30000);
+        sftpChannel = channel;
+        log.info("SFTP 通道已建立: {}@{}:{}", config.getUsername(), config.getHost(), config.getPort());
+        return sftpChannel;
+    }
+
+    private void disconnectSftpChannelLocked() {
+        if (sftpChannel != null) {
+            try {
+                sftpChannel.disconnect();
+            } catch (Exception ignored) {
+            }
+            sftpChannel = null;
+        }
+    }
+
+    public <T> T executeSftp(String action, SftpCallback<T> callback) {
+        synchronized (lock) {
+            for (int attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    return callback.doWithChannel(getSftpChannelLocked());
+                } catch (JSchException | SftpException e) {
+                    log.warn("SFTP 操作失败: action={}, attempt={}, message={}", action, attempt, e.getMessage());
+                    disconnect();
+                    if (attempt == 2) {
+                        throw new RuntimeException("SFTP 操作失败: " + action, e);
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("SFTP 操作失败: " + action);
+    }
+
     public CommandUtil.CommandResult executeCommand(String command) {
+        long start = System.currentTimeMillis();
+        log.debug("SSH exec start: command='{}', startMs={}", command, start);
         try {
             Session sess = getSession();
+            long afterGetSession = System.currentTimeMillis();
+            log.debug("SSH exec stage[getSession]: command='{}', costMs={}, sessionHash={}",
+                    command, afterGetSession - start, System.identityHashCode(sess));
+
             ChannelExec channel = (ChannelExec) sess.openChannel("exec");
+            long afterOpenChannel = System.currentTimeMillis();
+            log.debug("SSH exec stage[openChannel]: command='{}', costMs={}",
+                    command, afterOpenChannel - afterGetSession);
+
             channel.setCommand(command);
             channel.setInputStream(null);
+            long afterSetCommand = System.currentTimeMillis();
+            log.debug("SSH exec stage[setCommand]: command='{}', costMs={}",
+                    command, afterSetCommand - afterOpenChannel);
 
             InputStream stdout = channel.getInputStream();
             InputStream stderr = channel.getErrStream();
+            long afterSetupStreams = System.currentTimeMillis();
+            log.debug("SSH exec stage[setupStreams]: command='{}', costMs={}",
+                    command, afterSetupStreams - afterSetCommand);
 
             channel.connect(30000);
+            long afterConnect = System.currentTimeMillis();
+            log.debug("SSH exec stage[channel.connect]: command='{}', costMs={}, channelConnected={}",
+                    command, afterConnect - afterSetupStreams, channel.isConnected());
 
             String out = readStream(stdout);
+            long afterReadStdout = System.currentTimeMillis();
+            log.debug("SSH exec stage[readStdout]: command='{}', costMs={}, stdoutChars={}, channelClosed={}",
+                    command, afterReadStdout - afterConnect, out.length(), channel.isClosed());
+
             String err = readStream(stderr);
+            long afterReadStderr = System.currentTimeMillis();
+            log.debug("SSH exec stage[readStderr]: command='{}', costMs={}, stderrChars={}, channelClosed={}",
+                    command, afterReadStderr - afterReadStdout, err.length(), channel.isClosed());
 
             // 等待命令完成
+            int waitLoops = 0;
             while (!channel.isClosed()) {
+                waitLoops++;
                 Thread.sleep(50);
             }
+            long afterWaitClose = System.currentTimeMillis();
+            log.debug("SSH exec stage[waitChannelClose]: command='{}', costMs={}, loops={}, exitStatus={}",
+                    command, afterWaitClose - afterReadStderr, waitLoops, channel.getExitStatus());
 
             int exitCode = channel.getExitStatus();
             channel.disconnect();
+            long afterDisconnect = System.currentTimeMillis();
+            log.debug("SSH exec done: command='{}', exitCode={}, totalMs={}, disconnectCostMs={}, stdoutChars={}, stderrChars={}",
+                    command, exitCode, afterDisconnect - start, afterDisconnect - afterWaitClose, out.length(), err.length());
 
             return new CommandUtil.CommandResult(exitCode, out, err);
 
@@ -252,5 +334,10 @@ public class SshSessionManager {
         public Process getProcess() {
             return null;
         }
+    }
+
+    @FunctionalInterface
+    public interface SftpCallback<T> {
+        T doWithChannel(ChannelSftp channel) throws SftpException, JSchException;
     }
 }

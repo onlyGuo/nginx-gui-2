@@ -7,6 +7,7 @@ import ink.icoding.nginx.core.NginxClient.NginxException;
 import ink.icoding.nginx.core.NginxConfig;
 import ink.icoding.nginx.entity.*;
 import ink.icoding.nginx.utils.FileUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.file.Path;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 /**
  * Nginx 配置页面 API：per-file 管理 conf.d 文件。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/nginx/config")
 public class NginxConfigController {
@@ -52,7 +54,7 @@ public class NginxConfigController {
         }
 
         List<Map<String, Object>> configFiles = new ArrayList<>();
-        if (FileUtil.isDirectory(confDir)) {
+        try {
             List<Map<String, Object>> entries = FileUtil.listDirectory(confDir);
             for (Map<String, Object> entry : entries) {
                 String fileName = (String) entry.get("name");
@@ -65,6 +67,8 @@ public class NginxConfigController {
                 fileInfo.put("time", time instanceof Long ? formatTime((Long) time) : "");
                 configFiles.add(fileInfo);
             }
+        }catch (Exception e){
+            log.error("Failed to list conf.d directory: {}", confDir, e);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -85,7 +89,6 @@ public class NginxConfigController {
 
         List<Map<String, Object>> upstreams = new ArrayList<>();
         List<Map<String, Object>> servers = new ArrayList<>();
-
         if (name.equals(mainFileName)) {
             NginxConfig mainConfig = NginxConfig.parse(FileUtil.readFile(confPath));
             NginxHttpConfItem httpBlock = findHttpBlock(mainConfig);
@@ -99,14 +102,12 @@ public class NginxConfigController {
             }
         } else {
             String filePath = confDir + "/" + name;
-            if (FileUtil.exists(filePath)) {
-                NginxConfig fileConfig = NginxConfig.parse(FileUtil.readFile(filePath));
-                for (NginxConfItem item : fileConfig.getItems()) {
-                    if (item instanceof NginxUpstreamConfItem up) {
-                        upstreams.add(buildUpstream(up, name));
-                    } else if (item instanceof NginxServerConfItem srv) {
-                        servers.add(buildServer(srv, name));
-                    }
+            NginxConfig fileConfig = NginxConfig.parse(FileUtil.readFile(filePath));
+            for (NginxConfItem item : fileConfig.getItems()) {
+                if (item instanceof NginxUpstreamConfItem up) {
+                    upstreams.add(buildUpstream(up, name));
+                } else if (item instanceof NginxServerConfItem srv) {
+                    servers.add(buildServer(srv, name));
                 }
             }
         }
@@ -350,10 +351,10 @@ public class NginxConfigController {
         }
 
         // 备份 → 写入 → 校验 → 失败则回滚
-        String backup = filePath + ".bak";
         boolean hasBackup = false;
+        String backupContent = null;
         if (FileUtil.exists(filePath)) {
-            FileUtil.copy(filePath, backup, true);
+            backupContent = FileUtil.readFile(filePath);
             hasBackup = true;
         }
 
@@ -361,10 +362,9 @@ public class NginxConfigController {
 
         try {
             nginxClient.validateConfig();
-            FileUtil.deleteIfExists(backup);
         } catch (NginxException e) {
             if (hasBackup) {
-                FileUtil.move(backup, filePath, true);
+                FileUtil.writeFile(filePath, backupContent);
             } else {
                 FileUtil.deleteIfExists(filePath);
             }

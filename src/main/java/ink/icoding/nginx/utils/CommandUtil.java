@@ -45,6 +45,10 @@ public final class CommandUtil {
         sshSessionManager = manager;
     }
 
+    public static SshSessionManager getSshSessionManager() {
+        return sshSessionManager;
+    }
+
     /**
      * 是否启用了 SSH 远程执行
      */

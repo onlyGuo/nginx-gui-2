@@ -113,15 +113,13 @@ public class NginxClient {
         if (!FileUtil.exists(target)) {
             throw new NginxException("文件不存在: " + target);
         }
-        String backup = target + ".bak";
-        FileUtil.copy(target, backup, true);
+        String backupContent = FileUtil.readFile(target);
         FileUtil.deleteIfExists(target);
         try {
             validateConfig();
-            FileUtil.deleteIfExists(backup);
             return true;
         } catch (NginxException e) {
-            FileUtil.move(backup, target, true);
+            FileUtil.writeFile(target, backupContent);
             throw new NginxException("配置校验失败，已回滚: " + e.getMessage(), e);
         }
     }
@@ -203,11 +201,11 @@ public class NginxClient {
         String parentDir = lastSlash > 0 ? target.substring(0, lastSlash) : ".";
         FileUtil.createDirectories(parentDir);
 
-        String backup = target + ".bak";
         boolean hasBackup = false;
+        String backupContent = null;
 
         if (FileUtil.exists(target)) {
-            FileUtil.copy(target, backup, true);
+            backupContent = FileUtil.readFile(target);
             hasBackup = true;
         }
 
@@ -215,11 +213,10 @@ public class NginxClient {
 
         try {
             validateConfig();
-            FileUtil.deleteIfExists(backup);
             return true;
         } catch (NginxException e) {
             if (hasBackup) {
-                FileUtil.move(backup, target, true);
+                FileUtil.writeFile(target, backupContent);
             } else {
                 FileUtil.deleteIfExists(target);
             }
