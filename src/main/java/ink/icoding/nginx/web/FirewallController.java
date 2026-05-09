@@ -1,8 +1,8 @@
 package ink.icoding.nginx.web;
 
-import ink.icoding.nginx.core.NginxClient.NginxException;
+import ink.icoding.nginx.core.NginxException;
+import ink.icoding.nginx.utils.CommandResult;
 import ink.icoding.nginx.utils.CommandUtil;
-import ink.icoding.nginx.utils.CommandUtil.CommandResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;

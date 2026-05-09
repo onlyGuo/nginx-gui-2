@@ -32,31 +32,33 @@
         <!-- Add Rule Form -->
         <div class="card">
           <div class="card-header">添加规则</div>
-          <div class="card-body form-row">
-            <div class="form-group">
-              <label>端口</label>
-              <input v-model="newRule.port" type="text" placeholder="80" class="input" />
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">端口</label>
+                <input v-model="newRule.port" type="text" placeholder="80" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">协议</label>
+                <select v-model="newRule.protocol">
+                  <option value="tcp">TCP</option>
+                  <option value="udp">UDP</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">动作</label>
+                <select v-model="newRule.action">
+                  <option value="allow">允许</option>
+                  <option value="deny">拒绝</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">来源 IP</label>
+                <input v-model="newRule.source" type="text" placeholder="Any" />
+              </div>
             </div>
-            <div class="form-group">
-              <label>协议</label>
-              <select v-model="newRule.protocol" class="input">
-                <option value="tcp">TCP</option>
-                <option value="udp">UDP</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>动作</label>
-              <select v-model="newRule.action" class="input">
-                <option value="allow">允许</option>
-                <option value="deny">拒绝</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>来源 IP</label>
-              <input v-model="newRule.source" type="text" placeholder="Any" class="input" />
-            </div>
-            <div class="form-group form-action">
-              <button class="btn btn-primary btn-sm" @click="addRule" :disabled="!newRule.port">
+            <div style="margin-top: var(--space-md); display: flex; justify-content: flex-end">
+              <button class="btn btn-primary" @click="addRule" :disabled="!newRule.port">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 添加
               </button>
@@ -114,6 +116,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import AppLayout from '../components/layout/AppLayout.vue'
 import PathGuard from '../components/common/PathGuard.vue'
+import { api } from '../utils/api'
 
 const status = reactive({ tool: '', enabled: false, version: '' })
 const rules = ref([])
@@ -122,7 +125,7 @@ const newRule = reactive({ port: '', protocol: 'tcp', action: 'allow', source: '
 
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/v1/firewall/status')
+    const res = await api('/api/v1/firewall/status')
     const json = await res.json()
     if (json.code === 200 && json.data) {
       Object.assign(status, json.data)
@@ -134,7 +137,7 @@ async function fetchStatus() {
 
 async function fetchRules() {
   try {
-    const res = await fetch('/api/v1/firewall/rules')
+    const res = await api('/api/v1/firewall/rules')
     const json = await res.json()
     if (json.code === 200) {
       rules.value = json.data || []
@@ -147,7 +150,7 @@ async function fetchRules() {
 async function toggleFirewall() {
   const enabled = !status.enabled
   try {
-    const res = await fetch('/api/v1/firewall/toggle', {
+    const res = await api('/api/v1/firewall/toggle', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled })
@@ -164,7 +167,7 @@ async function toggleFirewall() {
 async function addRule() {
   if (!newRule.port) return
   try {
-    const res = await fetch('/api/v1/firewall/rules', {
+    const res = await api('/api/v1/firewall/rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -188,7 +191,7 @@ async function addRule() {
 async function deleteRule(rule) {
   try {
     const params = new URLSearchParams({ id: rule.id, protocol: rule.protocol || 'tcp' })
-    const res = await fetch('/api/v1/firewall/rules?' + params, { method: 'DELETE' })
+    const res = await api('/api/v1/firewall/rules?' + params, { method: 'DELETE' })
     const json = await res.json()
     if (json.code === 200) {
       fetchRules()
@@ -300,43 +303,11 @@ onMounted(async () => {
   transform: translateX(16px);
 }
 
-/* Form */
-.form-row {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-md);
-  flex-wrap: wrap;
-}
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 100px;
-}
-.form-group label {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-.form-group .input {
-  height: 32px;
-  padding: 0 var(--space-sm);
-  font-size: var(--font-size-sm);
-}
-.form-action {
-  align-self: flex-end;
-}
-.input {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-sans, sans-serif);
-  transition: border-color var(--transition-fast);
-}
-.input:focus {
-  outline: none;
-  border-color: var(--accent);
+/* Form Grid */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: var(--space-sm) var(--space-lg);
 }
 
 /* Rules Table */
@@ -414,17 +385,5 @@ onMounted(async () => {
 /* Buttons */
 .btn-danger:hover {
   color: var(--color-error, #ef5350) !important;
-}
-.btn-primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-}
-.btn-primary:hover {
-  opacity: 0.9;
-}
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

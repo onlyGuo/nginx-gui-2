@@ -3,8 +3,8 @@ package ink.icoding.nginx.utils;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
+import ink.icoding.nginx.config.SftpCallback;
 import ink.icoding.nginx.config.SshSessionManager;
-import ink.icoding.nginx.utils.CommandUtil.CommandResult;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -276,7 +276,7 @@ public final class FileUtil {
         return items;
     }
 
-    private static <T> T withSftp(String action, SshSessionManager.SftpCallback<T> callback) {
+    private static <T> T withSftp(String action, SftpCallback<T> callback) {
         SshSessionManager manager = CommandUtil.getSshSessionManager();
         if (manager == null) {
             throw new IllegalStateException("SSH 未启用，无法执行 SFTP 操作: " + action);

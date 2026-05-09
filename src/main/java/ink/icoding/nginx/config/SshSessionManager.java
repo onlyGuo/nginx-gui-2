@@ -1,6 +1,9 @@
 package ink.icoding.nginx.config;
 
 import com.jcraft.jsch.*;
+import ink.icoding.nginx.utils.CommandException;
+import ink.icoding.nginx.utils.CommandResult;
+import ink.icoding.nginx.utils.CommandStream;
 import ink.icoding.nginx.utils.CommandUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -143,7 +146,7 @@ public class SshSessionManager {
         throw new RuntimeException("SFTP 操作失败: " + action);
     }
 
-    public CommandUtil.CommandResult executeCommand(String command) {
+    public CommandResult executeCommand(String command) {
         long start = System.currentTimeMillis();
         log.debug("SSH exec start: command='{}', startMs={}", command, start);
         try {
@@ -200,21 +203,21 @@ public class SshSessionManager {
             log.debug("SSH exec done: command='{}', exitCode={}, totalMs={}, disconnectCostMs={}, stdoutChars={}, stderrChars={}",
                     command, exitCode, afterDisconnect - start, afterDisconnect - afterWaitClose, out.length(), err.length());
 
-            return new CommandUtil.CommandResult(exitCode, out, err);
+            return new CommandResult(exitCode, out, err);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return CommandUtil.CommandResult.error("SSH 命令执行被中断: " + e.getMessage());
+            return CommandResult.error("SSH 命令执行被中断: " + e.getMessage());
         } catch (JSchException e) {
             // 连接断开，清除缓存
             disconnect();
-            return CommandUtil.CommandResult.error("SSH 连接异常: " + e.getMessage());
+            return CommandResult.error("SSH 连接异常: " + e.getMessage());
         } catch (Exception e) {
-            return CommandUtil.CommandResult.error("SSH 命令执行异常: " + e.getMessage());
+            return CommandResult.error("SSH 命令执行异常: " + e.getMessage());
         }
     }
 
-    public CommandUtil.CommandStream streamCommand(String command, Consumer<String> listener) {
+    public CommandStream streamCommand(String command, Consumer<String> listener) {
         try {
             Session sess = getSession();
             ChannelExec channel = (ChannelExec) sess.openChannel("exec");
@@ -228,7 +231,7 @@ public class SshSessionManager {
                 stderr = channel.getErrStream();
             } catch (IOException e) {
                 channel.disconnect();
-                throw new CommandUtil.CommandException("SSH 获取流失败: " + e.getMessage(), e);
+                throw new CommandException("SSH 获取流失败: " + e.getMessage(), e);
             }
 
             channel.connect();
@@ -263,7 +266,7 @@ public class SshSessionManager {
 
         } catch (JSchException e) {
             disconnect();
-            throw new CommandUtil.CommandException("SSH 流式命令启动失败: " + e.getMessage(), e);
+            throw new CommandException("SSH 流式命令启动失败: " + e.getMessage(), e);
         }
     }
 
@@ -281,7 +284,7 @@ public class SshSessionManager {
         return sb.toString();
     }
 
-    private static class SshCommandStream implements CommandUtil.CommandStream {
+    private static class SshCommandStream implements CommandStream {
         private final ChannelExec channel;
         private final Future<?> stdoutFuture;
         private final Future<?> stderrFuture;
@@ -338,10 +341,5 @@ public class SshSessionManager {
         public Process getProcess() {
             return null;
         }
-    }
-
-    @FunctionalInterface
-    public interface SftpCallback<T> {
-        T doWithChannel(ChannelSftp channel) throws SftpException, JSchException;
     }
 }

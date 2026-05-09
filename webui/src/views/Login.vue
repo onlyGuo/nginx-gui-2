@@ -56,17 +56,21 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
-function handleLogin() {
+async function handleLogin() {
   error.value = ''
   loading.value = true
-  setTimeout(() => {
-    if (auth.login(username.value, password.value)) {
+  try {
+    const ok = await auth.login(username.value, password.value)
+    if (ok) {
       router.push('/dashboard')
     } else {
       error.value = '用户名或密码错误'
     }
+  } catch (e) {
+    error.value = '登录请求失败: ' + e.message
+  } finally {
     loading.value = false
-  }, 300)
+  }
 }
 </script>
 

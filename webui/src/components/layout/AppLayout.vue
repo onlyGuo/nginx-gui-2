@@ -30,7 +30,8 @@ const titles = {
   '/dashboard': '仪表页面',
   '/basic-config': '基础配置',
   '/nginx-config': 'Nginx 配置',
-  '/firewall': '防火墙管理'
+  '/firewall': '防火墙管理',
+  '/users': '账户管理'
 }
 
 const title = computed(() => titles[route.path] || 'Nginx GUI')

@@ -545,6 +545,7 @@ import BaseCombo from '../components/common/BaseCombo.vue'
 import LogPanel from '../components/common/LogPanel.vue'
 import MonacoEditor from '../components/common/MonacoEditor.vue'
 import EditorToolbar from '../components/common/EditorToolbar.vue'
+import { api } from '../utils/api'
 
 const upstreamStrategyOpts = [
   { value: '', label: '默认加权轮询', description: '默认策略，按 server 的 weight 参数加权分配请求' },
@@ -681,7 +682,7 @@ async function fetchRawContent() {
   if (!activeFile.value) return
   try {
     rawFileName.value = activeFile.value
-    const res = await fetch('/api/v1/nginx/config/raw?name=' + encodeURIComponent(rawFileName.value))
+    const res = await api('/api/v1/nginx/config/raw?name=' + encodeURIComponent(rawFileName.value))
     const json = await res.json()
     if (json.code === 200 && json.data) {
       rawContent.value = json.data.content
@@ -694,7 +695,7 @@ async function fetchRawContent() {
 async function saveRawContent() {
   rawSaveStatus.state = 'pending'
   try {
-    const res = await fetch('/api/v1/nginx/config/raw', {
+    const res = await api('/api/v1/nginx/config/raw', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: rawFileName.value, content: rawContent.value })
@@ -894,7 +895,7 @@ function populateUpstreamsServers(data) {
 // ---- Data Loading ----
 async function fetchConfig() {
   try {
-    const res = await fetch('/api/v1/nginx/config')
+    const res = await api('/api/v1/nginx/config')
     const json = await res.json()
     if (json.code === 200 && json.data) {
       const data = json.data
@@ -941,7 +942,7 @@ async function fetchConfig() {
 async function fetchFileData(name) {
   if (!name) return
   try {
-    const res = await fetch('/api/v1/nginx/config/file?name=' + encodeURIComponent(name))
+    const res = await api('/api/v1/nginx/config/file?name=' + encodeURIComponent(name))
     const json = await res.json()
     if (json.code === 200 && json.data) {
       populateUpstreamsServers(json.data)
@@ -984,7 +985,7 @@ async function saveFileBlocks() {
         })
       }))
     }
-    const res = await fetch('/api/v1/nginx/config/file', {
+    const res = await api('/api/v1/nginx/config/file', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -1046,7 +1047,7 @@ watch(() => currentServer.value?.ssl, (val) => {
 // ---- Actions ----
 async function toggleFile(f) {
   try {
-    const res = await fetch('/api/v1/nginx/config/file/toggle', {
+    const res = await api('/api/v1/nginx/config/file/toggle', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: f.name })
@@ -1075,7 +1076,7 @@ async function toggleFile(f) {
 async function deleteFile(f) {
   if (!confirm('确定删除 ' + f.name + ' ?')) return
   try {
-    const res = await fetch('/api/v1/nginx/config/file?name=' + encodeURIComponent(f.name), {
+    const res = await api('/api/v1/nginx/config/file?name=' + encodeURIComponent(f.name), {
       method: 'DELETE'
     })
     const json = await res.json()
@@ -1097,7 +1098,7 @@ async function createFile() {
     return
   }
   try {
-    const res = await fetch('/api/v1/nginx/config/file', {
+    const res = await api('/api/v1/nginx/config/file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newFile.name, port: newFile.port, domain: newFile.domain })
@@ -1121,7 +1122,7 @@ async function createFile() {
 async function clearMainBlocks() {
   if (!confirm('确定清除 nginx.conf 中的 Server 和 Upstream 配置？')) return
   try {
-    const res = await fetch('/api/v1/nginx/config/clear-main-blocks', { method: 'POST' })
+    const res = await api('/api/v1/nginx/config/clear-main-blocks', { method: 'POST' })
     const json = await res.json()
     if (json.code === 200) {
       addLog(true, 'nginx.conf 代理配置已清除')

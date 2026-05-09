@@ -253,6 +253,7 @@ import LogPanel from '../components/common/LogPanel.vue'
 import MonacoEditor from '../components/common/MonacoEditor.vue'
 import EditorToolbar from '../components/common/EditorToolbar.vue'
 import { usePathValidation } from '../composables/usePathValidation'
+import { api } from '../utils/api'
 
 const { valid, checking, check } = usePathValidation()
 
@@ -285,7 +286,7 @@ async function switchMode(newMode) {
 async function fetchRawContent() {
   try {
     rawFileName.value = 'nginx.conf'
-    const res = await fetch('/api/v1/nginx/config/raw?name=' + encodeURIComponent(rawFileName.value))
+    const res = await api('/api/v1/nginx/config/raw?name=' + encodeURIComponent(rawFileName.value))
     const json = await res.json()
     if (json.code === 200 && json.data) {
       rawContent.value = json.data.content
@@ -298,7 +299,7 @@ async function fetchRawContent() {
 async function saveRawContent() {
   rawSaveStatus.state = 'pending'
   try {
-    const res = await fetch('/api/v1/nginx/config/raw', {
+    const res = await api('/api/v1/nginx/config/raw', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: rawFileName.value, content: rawContent.value })
@@ -421,7 +422,7 @@ const savePaths = debounce(async () => {
   if (pathsPopulating) return
   saveStatus.state = 'pending'
   try {
-    const res = await fetch('/api/v1/paths', {
+    const res = await api('/api/v1/paths', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nginxBin: paths.nginxBin, nginxConf: paths.nginxConf, confDir: paths.confDir })
@@ -450,7 +451,7 @@ const savePaths = debounce(async () => {
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/v1/paths')
+    const res = await api('/api/v1/paths')
     const json = await res.json()
     if (json.code === 200 && json.data) {
       pathsPopulating = true
@@ -537,7 +538,7 @@ function populateForm(config) {
 
 async function fetchGlobalConfig() {
   try {
-    const res = await fetch('/api/v1/nginx/global-config')
+    const res = await api('/api/v1/nginx/global-config')
     const json = await res.json()
     if (json.code === 200 && json.data) {
       globalConfig.value = json.data.config
@@ -613,7 +614,7 @@ const saveGlobalConfig = debounce(async () => {
   saving = true
   saveStatus.state = 'pending'
   try {
-    const res = await fetch('/api/v1/nginx/global-config', {
+    const res = await api('/api/v1/nginx/global-config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ patches })

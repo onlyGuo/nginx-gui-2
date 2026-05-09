@@ -1,6 +1,7 @@
 package ink.icoding.nginx.config;
 
 import ink.icoding.nginx.core.NginxClient;
+import ink.icoding.nginx.core.NginxException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,7 +25,7 @@ public class NginxClientAutoConfiguration {
         try {
             client.reinit(config.getNginxBin(), config.getNginxConf(), config.getConfDir());
             log.info("NginxClient 初始化成功: bin={}, conf={}", config.getNginxBin(), config.getNginxConf());
-        } catch (NginxClient.NginxException e) {
+        } catch (NginxException e) {
             log.warn("NginxClient 初始化失败（路径无效），等待用户修正: {}", e.getMessage());
         }
 

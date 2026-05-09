@@ -1,9 +1,9 @@
 package ink.icoding.nginx.web;
 
-import ink.icoding.nginx.core.NginxClient.BadRequestException;
-import ink.icoding.nginx.core.NginxClient.NotFoundException;
+import ink.icoding.nginx.core.BadRequestException;
+import ink.icoding.nginx.core.NotFoundException;
+import ink.icoding.nginx.utils.CommandResult;
 import ink.icoding.nginx.utils.CommandUtil;
-import ink.icoding.nginx.utils.CommandUtil.CommandResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 

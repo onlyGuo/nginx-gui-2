@@ -1,7 +1,7 @@
 package ink.icoding.nginx.core;
 
+import ink.icoding.nginx.utils.CommandResult;
 import ink.icoding.nginx.utils.CommandUtil;
-import ink.icoding.nginx.utils.CommandUtil.CommandResult;
 import ink.icoding.nginx.utils.FileUtil;
 
 import java.nio.file.Paths;
@@ -231,27 +231,4 @@ public class NginxClient {
         return FileUtil.readFile(path);
     }
 
-    // ==================== 异常类 ====================
-
-    public static class NginxException extends RuntimeException {
-        public NginxException(String message) {
-            super(message);
-        }
-
-        public NginxException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
-
-    public static class NotFoundException extends RuntimeException {
-        public NotFoundException(String message) {
-            super(message);
-        }
-    }
-
-    public static class BadRequestException extends RuntimeException {
-        public BadRequestException(String message) {
-            super(message);
-        }
-    }
 }
