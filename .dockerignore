@@ -1,0 +1,14 @@
+.git
+.gitignore
+.idea
+*.iml
+.vscode
+.DS_Store
+webui/node_modules
+webui/dist
+target
+data/*.db
+*.log
+doc
+NginxParseDoc.md
+.claude

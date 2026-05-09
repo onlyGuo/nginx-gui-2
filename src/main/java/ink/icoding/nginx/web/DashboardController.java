@@ -131,7 +131,7 @@ public class DashboardController {
             if (cachedLogs != null) return ApiResponse.ok(cachedLogs);
         }
 
-        List<Map<String, String>> result = CommandUtil.isSshEnabled()
+        List<Map<String, String>> result = CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()
                 ? readLogsViaSsh(logPath, lines)
                 : readLogsLocal(logPath, lines);
 
@@ -194,7 +194,7 @@ public class DashboardController {
             return emitter;
         }
 
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             streamLogsViaSsh(emitter, logPath, type);
         } else {
             streamLogsLocal(emitter, logPath, type);
@@ -465,7 +465,7 @@ public class DashboardController {
         result.put("workerCount", 0);
 
         // 查找 nginx master 进程
-        CommandResult r = CommandUtil.execute("/bin/sh", "-c",
+        CommandResult r = CommandUtil.execute(true, "/bin/sh", "-c",
                 "ps aux | grep '[n]ginx: master' | head -1");
         if (r.isSuccess() && !r.getStdout().isBlank()) {
             result.put("running", true);

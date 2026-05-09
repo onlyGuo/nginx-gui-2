@@ -15,7 +15,8 @@ spring:
       enabled: true
       path: /h2-console
   sshd:
-    host: ${SSH_HOST}
+    model: ${NGINX_MODE:local}
+    host: ${SSH_HOST:}
     port: ${SSH_PORT:22}
-    username: ${SSH_USERNAME:root}
-    password: ${SSH_PASSWORD}
+    username: ${SSH_USERNAME:}
+    password: ${SSH_PASSWORD:}

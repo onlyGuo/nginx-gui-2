@@ -40,7 +40,7 @@ public final class FileUtil {
         }
         synchronized (FileUtil.class) {
              // 读取文件时加锁，避免 SSH 模式下的并发问题（如多个线程同时写入导致读取失败）
-            if (CommandUtil.isSshEnabled()) {
+            if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
                 String content = withSftp("读取文件: " + path, channel -> {
                     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                         channel.get(path, out);
@@ -64,7 +64,7 @@ public final class FileUtil {
     // ==================== 写入 ====================
 
     public static void writeFile(String path, String content) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() &&  !CommandUtil.isLocalNginx()) {
             synchronized (FileUtil.class) {
                 createDirectories(parentOf(path));
                 withSftp("写入文件: " + path, channel -> {
@@ -87,14 +87,14 @@ public final class FileUtil {
     // ==================== 存在性 / 类型判断 ====================
 
     public static boolean exists(String path) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             return withSftp("检查存在: " + path, channel -> statOrNull(channel, path) != null);
         }
         return Files.exists(Path.of(path));
     }
 
     public static boolean isRegularFile(String path) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             return withSftp("检查普通文件: " + path, channel -> {
                 SftpATTRS attrs = statOrNull(channel, path);
                 return attrs != null && !attrs.isDir();
@@ -104,7 +104,7 @@ public final class FileUtil {
     }
 
     public static boolean isDirectory(String path) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             return withSftp("检查目录: " + path, channel -> {
                 SftpATTRS attrs = statOrNull(channel, path);
                 return attrs != null && attrs.isDir();
@@ -116,7 +116,7 @@ public final class FileUtil {
     // ==================== 目录操作 ====================
 
     public static void createDirectories(String path) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             withSftp("创建目录: " + path, channel -> {
                 createDirectoriesRemote(channel, path);
                 return null;
@@ -133,7 +133,7 @@ public final class FileUtil {
     // ==================== 删除 ====================
 
     public static boolean deleteIfExists(String path) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             invalidateCache(path);
             return withSftp("删除路径: " + path, channel -> {
                 SftpATTRS attrs = statOrNull(channel, path);
@@ -158,7 +158,7 @@ public final class FileUtil {
     // ==================== 复制 / 移动 ====================
 
     public static void copy(String source, String target, boolean replaceExisting) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             String flag = replaceExisting ? "-f" : "-n";
             CommandResult r = CommandUtil.execute("cp " + flag + " " + source + " " + target);
             if (!r.isSuccess()) {
@@ -177,7 +177,7 @@ public final class FileUtil {
     }
 
     public static void move(String source, String target, boolean replaceExisting) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             withSftp("移动路径: " + source + " → " + target, channel -> {
                 SftpATTRS sourceAttrs = statOrNull(channel, source);
                 if (sourceAttrs == null) {
@@ -215,7 +215,7 @@ public final class FileUtil {
     // ==================== 目录列表 ====================
 
     public static List<Map<String, Object>> listDirectory(String dirPath) {
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             return listDirectoryRemote(dirPath);
         }
         return listDirectoryLocal(dirPath);

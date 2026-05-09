@@ -56,6 +56,10 @@ public final class CommandUtil {
         return sshSessionManager != null;
     }
 
+    public static boolean isLocalNginx(){
+        return sshSessionManager.isLocalNginx();
+    }
+
     private CommandUtil() {
     }
 
@@ -68,35 +72,45 @@ public final class CommandUtil {
      * @return 命令执行结果
      */
     public static CommandResult execute(String... command) {
-        return execute(null, null, -1, command);
+        return execute(false, null, null, -1, command);
+    }
+
+    /**
+     * 执行命令，等待完成并返回结果
+     *
+     * @param command 命令字符串（会按空格拆分）或可变参数命令
+     * @return 命令执行结果
+     */
+    public static CommandResult execute(boolean nginxCMD, String... command) {
+        return execute(nginxCMD, null, null, -1, command);
     }
 
     /**
      * 执行命令，指定工作目录
      */
     public static CommandResult execute(File workDir, String... command) {
-        return execute(workDir, null, -1, command);
+        return execute(false, workDir, null, -1, command);
     }
 
     /**
      * 执行命令，指定超时时间（毫秒）
      */
     public static CommandResult execute(long timeoutMs, String... command) {
-        return execute(null, null, timeoutMs, command);
+        return execute(false, null, null, timeoutMs, command);
     }
 
     /**
      * 执行命令，指定工作目录和超时时间
      */
     public static CommandResult execute(File workDir, long timeoutMs, String... command) {
-        return execute(workDir, null, timeoutMs, command);
+        return execute(false, workDir, null, timeoutMs, command);
     }
 
     /**
      * 执行命令，指定字符集
      */
     public static CommandResult execute(Charset charset, String... command) {
-        return execute(null, charset, -1, command);
+        return execute(false, null, charset, -1, command);
     }
 
     /**
@@ -108,10 +122,16 @@ public final class CommandUtil {
      * @param command  命令
      * @return 命令执行结果
      */
-    public static CommandResult execute(File workDir, Charset charset, long timeoutMs, String... command) {
+    public static CommandResult execute(boolean nginxCMD, File workDir, Charset charset, long timeoutMs, String... command) {
         SshSessionManager ssh = sshSessionManager;
-        if (ssh != null) {
-            return ssh.executeCommand(toSshCommand(command));
+        if (nginxCMD) {
+            if (ssh != null && !isLocalNginx()) {
+                return ssh.executeCommand(toSshCommand(command));
+            }
+        }else{
+            if (ssh != null) {
+                return ssh.executeCommand(toSshCommand(command));
+            }
         }
         return executeLocal(workDir, charset, timeoutMs, command);
     }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "spring.sshd")
 public class SshConfig {
+    private String model;
     private String host;
     private int port = 22;
     private String username;
@@ -17,5 +18,9 @@ public class SshConfig {
 
     public boolean isEnabled() {
         return host != null && !host.isBlank() && username != null && !username.isBlank();
+    }
+
+    public boolean isLocalNginx(){
+        return !isEnabled() || "local".equalsIgnoreCase(model);
     }
 }

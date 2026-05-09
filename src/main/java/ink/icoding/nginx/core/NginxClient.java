@@ -53,13 +53,13 @@ public class NginxClient {
         this.nginxPath = nginxPath;
         // SSH 模式下路径属于远程服务器，存储原始字符串，避免本地 Path 转换破坏路径
         // （Windows 的 Paths.get 会加盘符、toString 会用反斜杠）
-        if (CommandUtil.isSshEnabled()) {
+        if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
             this.configPath = configPath;
         } else {
             this.configPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
         }
         if (confDir != null && !confDir.isBlank()) {
-            if (CommandUtil.isSshEnabled()) {
+            if (CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()) {
                 this.confDirPath = confDir;
             } else {
                 this.confDirPath = Paths.get(confDir).toAbsolutePath().normalize().toString();
@@ -127,7 +127,7 @@ public class NginxClient {
     // ==================== 校验与重载 ====================
 
     public void validateConfig() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-t", "-c", configPath);
+        CommandResult result = CommandUtil.execute(true, nginxPath, "-t", "-c", configPath);
         if (!result.isSuccess()){
             // 输出内容方便用户排查问题
             throw new NginxException("校验失败 (exitCode=" + result.getExitCode() + "): " + result.getStderr() + ", " + result.getErrorMessage());
@@ -139,7 +139,7 @@ public class NginxClient {
 
 
     public void reload() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-s", "reload", "-c", configPath);
+        CommandResult result = CommandUtil.execute(true, nginxPath, "-s", "reload", "-c", configPath);
         requireSuccess(result, "nginx -s reload");
     }
 
@@ -149,17 +149,17 @@ public class NginxClient {
     }
 
     public void start() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-c", configPath);
+        CommandResult result = CommandUtil.execute(true, nginxPath, "-c", configPath);
         requireSuccess(result, "nginx");
     }
 
     public void stop() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-s", "stop", "-c", configPath);
+        CommandResult result = CommandUtil.execute(true, nginxPath, "-s", "stop", "-c", configPath);
         requireSuccess(result, "nginx -s stop");
     }
 
     public String version() {
-        CommandResult result = CommandUtil.execute(nginxPath, "-v");
+        CommandResult result = CommandUtil.execute(true, nginxPath, "-v");
         if (result.getErrorMessage() != null) {
             throw new NginxException("获取 nginx 版本失败: " + result.getErrorMessage());
         }

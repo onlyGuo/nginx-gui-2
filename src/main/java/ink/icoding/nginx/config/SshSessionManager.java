@@ -41,6 +41,10 @@ public class SshSessionManager {
         CommandUtil.setSshSessionManager(this);
     }
 
+    public boolean isLocalNginx(){
+        return config.isLocalNginx();
+    }
+
     @PreDestroy
     public void destroy() {
         executor.shutdownNow();

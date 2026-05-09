@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  nginx-gui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    ports:
+      - "${NGINX_GUI_PORT:-8080}:80"
+    volumes:
+      - nginx-gui-data:/app/data
+    environment:
+      # local = manage container nginx, remote = manage remote nginx via SSH
+      - NGINX_MODE=${NGINX_MODE:-local}
+      # SSH for dashboard host system info (optional)
+      - SSH_SYSTEM_HOST=${SSH_SYSTEM_HOST:-}
+      - SSH_SYSTEM_PORT=${SSH_SYSTEM_PORT:-22}
+      - SSH_SYSTEM_USERNAME=${SSH_SYSTEM_USERNAME:-}
+      - SSH_SYSTEM_PASSWORD=${SSH_SYSTEM_PASSWORD:-}
+      # Remote nginx SSH (when NGINX_MODE=remote)
+      - SSH_HOST=${SSH_HOST:-}
+      - SSH_PORT=${SSH_PORT:-22}
+      - SSH_USERNAME=${SSH_USERNAME:-}
+      - SSH_PASSWORD=${SSH_PASSWORD:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  nginx-gui-data:
