@@ -115,9 +115,12 @@ public class DashboardController {
         return ApiResponse.ok(data);
     }
 
+    private static final int MAX_LOG_LINES = 10000;
+
     @GetMapping("/logs")
     public ApiResponse<List<Map<String, String>>> logs(@RequestParam(defaultValue = "access") String type,
                                                         @RequestParam(defaultValue = "100") int lines) {
+        lines = Math.min(Math.max(lines, 1), MAX_LOG_LINES);
         String logPath = getLogPath(type);
         if (logPath == null || logPath.isBlank()) {
             return ApiResponse.ok(List.of());
@@ -129,6 +132,12 @@ public class DashboardController {
         if (cached != null && (now - cached) < LOG_CACHE_TTL_MS) {
             List<Map<String, String>> cachedLogs = logCache.get(cacheKey);
             if (cachedLogs != null) return ApiResponse.ok(cachedLogs);
+        }
+
+        // Evict stale entries when cache grows too large
+        if (logCache.size() > 50) {
+            logCacheTime.entrySet().removeIf(e -> (now - e.getValue()) >= LOG_CACHE_TTL_MS);
+            logCache.keySet().retainAll(logCacheTime.keySet());
         }
 
         List<Map<String, String>> result = CommandUtil.isSshEnabled() && !CommandUtil.isLocalNginx()
@@ -219,12 +228,13 @@ public class DashboardController {
             String key = type + ":" + emitter.hashCode();
             filePositions.put(key, pos);
 
-            ScheduledFuture<?> task = sseScheduler.scheduleAtFixedRate(
-                    () -> tailLocal(emitter, path, key),
+            final ScheduledFuture<?>[] taskHolder = new ScheduledFuture<?>[1];
+            taskHolder[0] = sseScheduler.scheduleAtFixedRate(
+                    () -> tailLocal(emitter, path, key, taskHolder[0]),
                     500, 500, TimeUnit.MILLISECONDS);
 
             Runnable cleanup = () -> {
-                task.cancel(false);
+                if (taskHolder[0] != null) taskHolder[0].cancel(false);
                 filePositions.remove(key);
             };
             emitter.onCompletion(cleanup);
@@ -235,17 +245,19 @@ public class DashboardController {
         }
     }
 
-    private void tailLocal(SseEmitter emitter, Path path, String key) {
+    private void tailLocal(SseEmitter emitter, Path path, String key, ScheduledFuture<?> task) {
         try {
             if (!Files.exists(path)) return;
             long size = Files.size(path);
             long lastPos = filePositions.getOrDefault(key, size);
             if (size > lastPos) {
+                // Cap single read to 4MB to prevent memory spike on burst writes
+                long readLimit = Math.min(size, lastPos + 4L * 1024 * 1024);
                 try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "r")) {
                     raf.seek(lastPos);
                     List<String> newLines = new ArrayList<>();
                     String line;
-                    while ((line = raf.readLine()) != null) {
+                    while (raf.getFilePointer() < readLimit && (line = raf.readLine()) != null) {
                         newLines.add(new String(line.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8));
                     }
                     if (!newLines.isEmpty()) {
@@ -257,6 +269,9 @@ public class DashboardController {
                 filePositions.put(key, 0L);
             }
         } catch (Exception e) {
+            // Cancel task immediately to prevent repeated failures on a dead emitter
+            if (task != null) task.cancel(false);
+            filePositions.remove(key);
             try { emitter.complete(); } catch (Exception ignored) {}
         }
     }
@@ -278,10 +293,17 @@ public class DashboardController {
 
         // 启动 tail -f 流式命令
         String cmd = "tail -f -n 0 " + logPath;
+        // Use a bounded buffer to prevent memory growth if consumer stalls
         List<String> lineBuffer = new CopyOnWriteArrayList<>();
+        final int MAX_BUFFER_LINES = 50000;
         CommandStream sshStream;
         try {
-            sshStream = CommandUtil.stream(cmd, lineBuffer::add);
+            sshStream = CommandUtil.stream(cmd, line -> {
+                if (lineBuffer.size() < MAX_BUFFER_LINES) {
+                    lineBuffer.add(line);
+                }
+                // Silently drop lines if buffer is full (consumer is stalled or disconnected)
+            });
         } catch (Exception e) {
             // tail -f 启动失败（文件不存在等），仅发送初始数据
             emitter.complete();
@@ -581,7 +603,10 @@ public class DashboardController {
     /**
      * Read the last N lines from a file without loading the entire file into memory.
      * Reads chunks from the end, counting newlines until enough lines are found.
+     * Caps at MAX_TAIL_BYTES to prevent memory exhaustion on files with very long lines.
      */
+    private static final long MAX_TAIL_BYTES = 4L * 1024 * 1024; // 4MB max read
+
     private List<String> tailLines(Path path, int n) throws IOException {
         if (n <= 0) return List.of();
         long fileLength = Files.size(path);
@@ -589,23 +614,30 @@ public class DashboardController {
 
         int chunkSize = (int) Math.min(8192, fileLength);
         byte[] buffer = new byte[chunkSize];
-        StringBuilder tail = new StringBuilder();
+        // Collect chunks in a list to avoid O(n^2) insert(0, ...)
+        List<String> chunks = new ArrayList<>();
         long pos = fileLength;
+        long totalRead = 0;
         int newlineCount = 0;
 
-        // Read chunks from the end until we have enough newlines
-        while (pos > 0 && newlineCount <= n) {
-            int readLen = Math.min(chunkSize, (int) pos);
+        while (pos > 0 && newlineCount <= n && totalRead < MAX_TAIL_BYTES) {
+            int readLen = Math.min(chunkSize, (int) Math.min(pos, MAX_TAIL_BYTES - totalRead));
             pos -= readLen;
             try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "r")) {
                 raf.seek(pos);
                 raf.readFully(buffer, 0, readLen);
             }
-            String chunk = new String(buffer, 0, readLen, StandardCharsets.UTF_8);
-            tail.insert(0, chunk);
+            chunks.add(new String(buffer, 0, readLen, StandardCharsets.UTF_8));
+            totalRead += readLen;
             for (int i = 0; i < readLen; i++) {
                 if (buffer[i] == '\n') newlineCount++;
             }
+        }
+
+        // Reverse chunks to build the tail content
+        StringBuilder tail = new StringBuilder((int) totalRead);
+        for (int i = chunks.size() - 1; i >= 0; i--) {
+            tail.append(chunks.get(i));
         }
 
         String[] allLines = tail.toString().split("\n", -1);
