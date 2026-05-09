@@ -31,6 +31,11 @@ const routes = [
     path: '/firewall',
     name: 'Firewall',
     component: () => import('../views/Firewall.vue')
+  },
+  {
+    path: '/users',
+    name: 'UserManagement',
+    component: () => import('../views/UserManagement.vue')
   }
 ]
 

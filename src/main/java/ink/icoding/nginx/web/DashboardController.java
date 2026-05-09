@@ -3,9 +3,9 @@ package ink.icoding.nginx.web;
 import ink.icoding.nginx.config.PathConfig;
 import ink.icoding.nginx.config.PathConfigRepository;
 import ink.icoding.nginx.core.NginxClient;
+import ink.icoding.nginx.utils.CommandResult;
+import ink.icoding.nginx.utils.CommandStream;
 import ink.icoding.nginx.utils.CommandUtil;
-import ink.icoding.nginx.utils.CommandUtil.CommandResult;
-import ink.icoding.nginx.utils.CommandUtil.CommandStream;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -501,7 +501,7 @@ public class DashboardController {
         // 获取更精确的 uptime（通过 ps -o etime）
         if ((Boolean) result.get("running")) {
             String pid = (String) result.get("pid");
-            CommandResult uptimeR = CommandUtil.execute("/bin/sh", "-c",
+            CommandResult uptimeR = CommandUtil.execute(true, "/bin/sh", "-c",
                     "ps -o etime= -p " + pid);
             if (uptimeR.isSuccess() && !uptimeR.getStdout().isBlank()) {
                 result.put("uptime", uptimeR.getStdout().trim());
@@ -509,7 +509,7 @@ public class DashboardController {
         }
 
         // Worker 进程数
-        CommandResult wc = CommandUtil.execute("/bin/sh", "-c",
+        CommandResult wc = CommandUtil.execute(true, "/bin/sh", "-c",
                 "ps aux | grep '[n]ginx: worker' | wc -l");
         if (wc.isSuccess() && !wc.getStdout().isBlank()) {
             try {

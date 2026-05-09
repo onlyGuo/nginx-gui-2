@@ -100,6 +100,7 @@
 
 <script setup>
 import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
+import { api } from '../../utils/api'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -146,7 +147,7 @@ function positionDropdown() {
 async function fetchSuggestions(val) {
   const { dir } = parsePath(val)
   try {
-    const res = await fetch('/api/v1/files?path=' + encodeURIComponent(dir))
+    const res = await api('/api/v1/files?path=' + encodeURIComponent(dir))
     const json = await res.json()
     if (json.code === 200 && json.data?.items) {
       const { partial } = parsePath(val)
@@ -280,7 +281,7 @@ async function fetchDir(dirPath) {
   loadError.value = ''
   try {
     const typeParam = props.type === 'dir' ? 'dir' : 'file'
-    const res = await fetch('/api/v1/files?path=' + encodeURIComponent(dirPath) + '&type=' + typeParam)
+    const res = await api('/api/v1/files?path=' + encodeURIComponent(dirPath) + '&type=' + typeParam)
     const json = await res.json()
     if (json.code === 200 && json.data) {
       currentDir.value = json.data.path

@@ -140,6 +140,7 @@ import AppLayout from '../components/layout/AppLayout.vue'
 import PathGuard from '../components/common/PathGuard.vue'
 import BaseSelect from '../components/common/BaseSelect.vue'
 import { useThemeStore } from '../stores/theme'
+import { api, sseUrl } from '../utils/api'
 
 const logTypeOpts = [
   { value: 'access', label: 'access.log', description: '记录所有 HTTP 请求的访问日志' },
@@ -318,7 +319,7 @@ let chartsInited = false
 
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/v1/dashboard/status')
+    const res = await api('/api/v1/dashboard/status')
     const json = await res.json()
     if (json.code === 200 && json.data) {
       const d = json.data
@@ -427,7 +428,7 @@ function connectLogSSE() {
     logSSE.close()
     logSSE = null
   }
-  logSSE = new EventSource('/api/v1/dashboard/logs/stream?type=' + logType.value)
+  logSSE = new EventSource(sseUrl('/api/v1/dashboard/logs/stream?type=' + logType.value))
 
   logSSE.addEventListener('init', (e) => {
     const lines = JSON.parse(e.data)
