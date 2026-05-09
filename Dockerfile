@@ -86,6 +86,8 @@ RUN chmod +x /app/entrypoint.sh
 # Remove default nginx config (will be set up by entrypoint if in local mode)
 RUN rm -f /etc/nginx/conf.d/default.conf
 
+RUN rm -f /var/log/nginx/access.log /var/log/nginx/error.log
+
 # Data volume (H2 database)
 VOLUME /app/data
 

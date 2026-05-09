@@ -145,13 +145,12 @@ public class DashboardController {
         Path path = Path.of(logPath);
         if (!Files.exists(path)) return result;
         try {
-            List<String> allLines = Files.readAllLines(path, StandardCharsets.UTF_8);
-            int start = Math.max(0, allLines.size() - lines);
-            for (int i = start; i < allLines.size(); i++) {
-                String line = allLines.get(i).trim();
-                if (line.isEmpty()) continue;
+            List<String> tail = tailLines(path, lines);
+            for (String line : tail) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) continue;
                 Map<String, String> entry = new LinkedHashMap<>();
-                entry.put("text", line);
+                entry.put("text", trimmed);
                 result.add(entry);
             }
         } catch (IOException ignored) {
@@ -214,9 +213,8 @@ public class DashboardController {
         }
 
         try {
-            List<String> allLines = Files.readAllLines(path, StandardCharsets.UTF_8);
-            int start = Math.max(0, allLines.size() - 100);
-            emitter.send(SseEmitter.event().name("init").data(allLines.subList(start, allLines.size())));
+            List<String> tail = tailLines(path, 100);
+            emitter.send(SseEmitter.event().name("init").data(tail));
             long pos = Files.size(path);
             String key = type + ":" + emitter.hashCode();
             filePositions.put(key, pos);
@@ -578,6 +576,45 @@ public class DashboardController {
             }
         }
         return 0;
+    }
+
+    /**
+     * Read the last N lines from a file without loading the entire file into memory.
+     * Reads chunks from the end, counting newlines until enough lines are found.
+     */
+    private List<String> tailLines(Path path, int n) throws IOException {
+        if (n <= 0) return List.of();
+        long fileLength = Files.size(path);
+        if (fileLength == 0) return List.of();
+
+        int chunkSize = (int) Math.min(8192, fileLength);
+        byte[] buffer = new byte[chunkSize];
+        StringBuilder tail = new StringBuilder();
+        long pos = fileLength;
+        int newlineCount = 0;
+
+        // Read chunks from the end until we have enough newlines
+        while (pos > 0 && newlineCount <= n) {
+            int readLen = Math.min(chunkSize, (int) pos);
+            pos -= readLen;
+            try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "r")) {
+                raf.seek(pos);
+                raf.readFully(buffer, 0, readLen);
+            }
+            String chunk = new String(buffer, 0, readLen, StandardCharsets.UTF_8);
+            tail.insert(0, chunk);
+            for (int i = 0; i < readLen; i++) {
+                if (buffer[i] == '\n') newlineCount++;
+            }
+        }
+
+        String[] allLines = tail.toString().split("\n", -1);
+        // Drop the trailing empty string if the content ended with \n
+        if (allLines.length > 0 && allLines[allLines.length - 1].isEmpty()) {
+            allLines = Arrays.copyOf(allLines, allLines.length - 1);
+        }
+        int start = Math.max(0, allLines.length - n);
+        return Arrays.asList(Arrays.copyOfRange(allLines, start, allLines.length));
     }
 
     private String formatBytes(long bytes) {
