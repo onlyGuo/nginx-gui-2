@@ -20,11 +20,11 @@
 <h1 align="center">Nginx GUI 2</h1>
 
 <p align="center">
-  <b>A True Nginx Configuration Manager — Not Just Another Config Generator</b>
+  <b>A True Nginx Configuration Manager — With AI Agent Built In</b>
 </p>
 
 <p align="center">
-  Deep-parsing Nginx configs with UI / Code dual-mode editing.<br/>
+  Deep-parsing Nginx configs with UI / Code dual-mode editing, plus an AI agent that lets anyone operate Nginx like a pro.<br/>
   Parse, modify, and manage any valid Nginx configuration without breaking existing content.
 </p>
 
@@ -47,7 +47,7 @@
 
 Traditional Nginx GUI tools are **config generators** — they let you fill in a form and generate a configuration file. But what happens when you already have an existing, complex Nginx config? They can't parse it. They can't modify it. They force you to start from scratch.
 
-**Nginx GUI 2 is fundamentally different.** It is a true **configuration manager** that deeply understands Nginx syntax:
+**Nginx GUI 2 is fundamentally different.** It is a true **configuration manager** that deeply understands Nginx syntax, and it comes with a built-in **AI Agent** that lets anyone perform expert-level Nginx operations — no expertise required:
 
 | | Traditional GUI Tools | Nginx GUI 2 |
 |---|---|---|
@@ -56,11 +56,25 @@ Traditional Nginx GUI tools are **config generators** — they let you fill in a
 | **Edit existing configs without losing content** | No | **Yes** |
 | **UI mode <-> Code mode free switching** | No | **Yes** |
 | **Preserve comments, formatting, custom directives** | No | **Yes** |
+| **AI natural-language Nginx management** | No | **Yes** |
 | Manage any valid Nginx config | No | **Yes** |
 
-**In short:** If you have a 500-line `nginx.conf` with custom comments, unusual directives, and complex nesting — Nginx GUI 2 can load it, display it visually, let you edit it in the UI or in a code editor, and save it back **without destroying any original content**.
+**In short:** If you have a 500-line `nginx.conf` with custom comments, unusual directives, and complex nesting — Nginx GUI 2 can load it, display it visually, let you edit it in the UI or in a code editor, and save it back **without destroying any original content**. And if you're stuck — a 502 error you can't debug, an SSL config you've never written, a performance issue you don't know how to tune — the built-in AI Agent can diagnose and fix it for you, just by asking in plain language.
 
-> It's not a config generator. It's a **deep-compatible, visual-enabled Nginx editor** that gives you absolute freedom to control Nginx.
+> It's not a config generator. It's a **deep-compatible, visual-enabled Nginx editor with an AI expert built in** that gives you absolute freedom to control Nginx.
+
+### AI Agent — Expert-Level Nginx Operations for Everyone
+
+The AI Agent is **not** just a chatbot wrapper. It is a purpose-built agent with real tools that can read your Nginx config, search for patterns, edit specific lines, validate syntax, and control the Nginx service — all driven by natural language.
+
+- **"My site returns 502 after deploying"** — The agent reads your upstream config, identifies the issue, and fixes it.
+- **"Add HTTPS with a Let's Encrypt certificate"** — The agent writes the full SSL config, including HTTP-to-HTTPS redirect.
+- **"Rate-limit the login endpoint to 5 requests per minute"** — The agent adds `limit_req_zone` and applies it to the right location block.
+- **"My config has a syntax error and I don't understand it"** — The agent runs `nginx -t`, reads the error, and corrects the problem.
+
+You don't need to know Nginx syntax. You don't need to know which file to edit. You don't need to memorize directives. **Just describe what you want, and the agent does the rest.**
+
+**How to use:** Go to the "AI Config" page in the sidebar, click the gear icon in the toolbar above the message input, fill in your Base URL, API Key, protocol (OpenAI / Anthropic / OpenAIResponse), and model name, then save. Each user's configuration and conversation session is fully isolated.
 
 ---
 
@@ -68,6 +82,7 @@ Traditional Nginx GUI tools are **config generators** — they let you fill in a
 
 | Feature | Description |
 |---------|-------------|
+| **AI Agent** | Not just a new interface — it's an expert at your fingertips. Stuck on a 502? Don't know how to configure SSL? Need rate limiting but unfamiliar with the syntax? Just describe your problem in plain language. The AI agent reads your actual config, diagnoses issues, applies fixes, validates syntax, and reloads Nginx — all automatically. No Nginx expertise required. Supports OpenAI, Anthropic, and other LLM providers |
 | **Dashboard** | Real-time system monitoring (CPU, memory, disk, connections), Nginx status, SSE streaming access/error logs with historical charts |
 | **Nginx Config Management** | Deep-parse `conf.d/*.conf` files. Structured editing (Server, Upstream, Location, SSL, Proxy) + raw text editing via Monaco Editor with syntax highlighting |
 | **Global Config** | Structured editing of main/events/http-level directives (worker_processes, keepalive, gzip, SSL, log_format, etc.) |
@@ -89,11 +104,11 @@ Traditional Nginx GUI tools are **config generators** — they let you fill in a
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/-Backend-orange?style=flat-square" alt="Backend" /></td>
-    <td>Java 17, Spring Boot 4.0, H2 Database, JSch (SSH)</td>
+    <td>Java 17, Spring Boot 4.0, H2 Database, JSch (SSH), Agent4j (AI Agent)</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/-Frontend-brightgreen?style=flat-square" alt="Frontend" /></td>
-    <td>Vue 3, Pinia, Vite, Monaco Editor, ECharts</td>
+    <td>Vue 3, Pinia, Vite, Monaco Editor, ECharts, SSE Streaming</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/-Infra-lightgrey?style=flat-square" alt="Infra" /></td>
@@ -194,13 +209,14 @@ docker buildx build --platform linux/amd64,linux/arm64 -t nginx-gui-2 .
 ```
 nginx-gui-2/
 ├── src/main/java/ink/icoding/nginx/
-│   ├── config/          # SSH, Path, Auto-configuration
+│   ├── agent/           # AI Agent skills and tools (read, search, edit, control Nginx)
+│   ├── config/          # SSH, Path, AI Config, Auto-configuration
 │   ├── core/            # NginxClient -- core nginx parser & operations
 │   ├── utils/           # CommandUtil, FileUtil (local/SSH abstraction)
-│   └── web/             # REST controllers (Dashboard, Config, Firewall, Files)
+│   └── web/             # REST controllers (Dashboard, Config, Firewall, Files, AI Chat)
 ├── webui/               # Vue 3 SPA frontend
 │   └── src/
-│       ├── views/       # Dashboard, NginxConfig, BasicConfig, Firewall, Login
+│       ├── views/       # Dashboard, NginxConfig, BasicConfig, Firewall, AiChat, Login
 │       └── components/  # MonacoEditor, LogPanel, Layout
 ├── docker/              # nginx.conf, entrypoint.sh
 ├── Dockerfile           # Multi-stage build (Node -> Maven -> Runtime)

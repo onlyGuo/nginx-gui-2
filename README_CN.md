@@ -20,11 +20,11 @@
 <h1 align="center">Nginx GUI 2</h1>
 
 <p align="center">
-  <b>真正的 Nginx 配置管理器 —— 不是又一个配置生成器</b>
+  <b>真正的 Nginx 配置管理器 —— 内置 AI 智能体</b>
 </p>
 
 <p align="center">
-  深度解析 Nginx 配置语法，UI / Code 双模式自由切换。<br/>
+  深度解析 Nginx 配置语法，UI / Code 双模式自由切换，更内置 AI 智能体让任何人都能轻松运维 Nginx。<br/>
   解析、修改、管理任意符合 Nginx 语法的配置，不破坏原始内容。
 </p>
 
@@ -47,7 +47,7 @@
 
 传统的 Nginx GUI 工具本质上是**配置生成器** —— 你填表，它生成配置文件。但如果你已经有一套复杂的 Nginx 配置呢？它们无法解析，无法修改，只能让你从头来过。
 
-**Nginx GUI 2 截然不同。** 它是一个真正理解 Nginx 语法的**配置管理器**：
+**Nginx GUI 2 截然不同。** 它是一个真正理解 Nginx 语法的**配置管理器**，并且内置了 **AI 智能体**，让任何人都能做出专家级的 Nginx 运维操作：
 
 | | 传统 GUI 工具 | Nginx GUI 2 |
 |---|---|---|
@@ -56,11 +56,25 @@
 | **编辑已有配置且不丢失内容** | 不支持 | **支持** |
 | **UI 模式 <-> Code 模式自由切换** | 不支持 | **支持** |
 | **保留注释、格式、自定义指令** | 不支持 | **支持** |
+| **AI 自然语言管理 Nginx** | 不支持 | **支持** |
 | 管理任意合法 Nginx 配置 | 不支持 | **支持** |
 
-**简单来说：** 如果你有一个 500 行的 `nginx.conf`，里面包含自定义注释、特殊指令和复杂嵌套 —— Nginx GUI 2 可以加载它、可视化展示它、让你在 UI 或代码编辑器中修改它，然后保存回去，**不会破坏任何原始内容**。
+**简单来说：** 如果你有一个 500 行的 `nginx.conf`，里面包含自定义注释、特殊指令和复杂嵌套 —— Nginx GUI 2 可以加载它、可视化展示它、让你在 UI 或代码编辑器中修改它，然后保存回去，**不会破坏任何原始内容**。而当你遇到不知道怎么解决的问题时 —— 比如看不懂的 502 错误、从没写过的 SSL 配置、不知道如何调优的性能瓶颈 —— 内置的 AI 智能体能帮你诊断并修复，只需要用自然语言描述你的问题。
 
-> 它不是配置生成器，而是一个**深度兼容的可视化 Nginx 编辑器**，让你绝对自由地掌控 Nginx。
+> 它不是配置生成器，而是一个**深度兼容、内置 AI 专家的可视化 Nginx 编辑器**，让你绝对自由地掌控 Nginx。
+
+### AI 智能体 —— 让任何人都能做出专家级运维操作
+
+AI 智能体**不是**套了一层对话壳的配置工具，而是一个拥有真实操作能力的 Agent。它能读取你的 Nginx 配置、搜索定位、精确编辑、校验语法、控制服务 —— 全部通过自然语言驱动。
+
+- **"我的网站部署后返回 502"** —— 智能体读取你的 upstream 配置，定位问题并修复。
+- **"给站点加上 HTTPS，证书用 Let's Encrypt"** —— 智能体自动编写完整的 SSL 配置，包括 HTTP 到 HTTPS 的跳转。
+- **"对登录接口做限流，每分钟最多 5 次请求"** —— 智能体添加 `limit_req_zone` 并应用到正确的 location 块。
+- **"配置报了语法错误我看不懂"** —— 智能体执行 `nginx -t`，读取错误信息并修正问题。
+
+你不需要懂 Nginx 语法，不需要知道该编辑哪个文件，不需要记住任何指令。**只需描述你想要什么，剩下的交给智能体。**
+
+**如何使用：** 在左侧菜单进入「AI 自助配置」页面，点击消息输入框上方工具栏的齿轮图标，填写 Base URL、API Key、接口协议（OpenAI / Anthropic / OpenAIResponse）和模型名称，保存即可。每个用户的配置和对话 Session 完全隔离。
 
 ---
 
@@ -68,6 +82,7 @@
 
 | 功能 | 说明 |
 |------|------|
+| **AI 智能体** | 这不只是换了一种交互方式 —— 而是让每个人都拥有了一位 Nginx 运维专家。遇到 502 不知道怎么排查？不熟悉 SSL 怎么配置？需要限流但不懂语法？用自然语言描述你的问题，AI 自动读取你的实际配置、诊断问题、修复错误、校验语法并重载 Nginx。不需要任何 Nginx 专业知识，支持 OpenAI、Anthropic 等多种大模型接入 |
 | **仪表盘** | 实时系统监控（CPU、内存、磁盘、连接数），Nginx 状态，SSE 流式推送访问/错误日志，历史趋势图表 |
 | **Nginx 配置管理** | 深度解析 `conf.d/*.conf` 文件。结构化编辑（Server、Upstream、Location、SSL、代理）+ Monaco Editor 原始文本编辑（带语法高亮） |
 | **全局配置** | 结构化编辑 main/events/http 级别指令（worker_processes、keepalive、gzip、SSL、log_format 等） |
@@ -89,11 +104,11 @@
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/-后端-orange?style=flat-square" alt="后端" /></td>
-    <td>Java 17, Spring Boot 4.0, H2 数据库, JSch (SSH)</td>
+    <td>Java 17, Spring Boot 4.0, H2 数据库, JSch (SSH), Agent4j (AI 智能体)</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/-前端-brightgreen?style=flat-square" alt="前端" /></td>
-    <td>Vue 3, Pinia, Vite, Monaco Editor, ECharts</td>
+    <td>Vue 3, Pinia, Vite, Monaco Editor, ECharts, SSE 流式通信</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/-基础设施-lightgrey?style=flat-square" alt="基础设施" /></td>
@@ -194,13 +209,14 @@ docker buildx build --platform linux/amd64,linux/arm64 -t nginx-gui-2 .
 ```
 nginx-gui-2/
 ├── src/main/java/ink/icoding/nginx/
-│   ├── config/          # SSH、路径、自动配置
+│   ├── agent/           # AI 智能体技能与工具（读取、搜索、编辑、控制 Nginx）
+│   ├── config/          # SSH、路径、AI 配置、自动配置
 │   ├── core/            # NginxClient -- Nginx 核心解析器与操作
 │   ├── utils/           # CommandUtil、FileUtil（本地/SSH 抽象）
-│   └── web/             # REST 控制器（仪表盘、配置、防火墙、文件）
+│   └── web/             # REST 控制器（仪表盘、配置、防火墙、文件、AI 对话）
 ├── webui/               # Vue 3 SPA 前端
 │   └── src/
-│       ├── views/       # Dashboard、NginxConfig、BasicConfig、Firewall、Login
+│       ├── views/       # Dashboard、NginxConfig、BasicConfig、Firewall、AiChat、Login
 │       └── components/  # MonacoEditor、LogPanel、Layout
 ├── docker/              # nginx.conf、entrypoint.sh
 ├── Dockerfile           # 多阶段构建（Node -> Maven -> Runtime）
