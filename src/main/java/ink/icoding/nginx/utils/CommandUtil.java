@@ -62,6 +62,10 @@ public final class CommandUtil {
         return execute(false, null, null, timeoutMs, command);
     }
 
+    public static CommandResult execute(boolean isLocalNginx, long timeoutMs, String... command) {
+        return execute(isLocalNginx, null, null, timeoutMs, command);
+    }
+
     public static CommandResult execute(File workDir, long timeoutMs, String... command) {
         return execute(false, workDir, null, timeoutMs, command);
     }

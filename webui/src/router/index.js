@@ -28,6 +28,11 @@ const routes = [
     component: () => import('../views/NginxConfig.vue')
   },
   {
+    path: '/ssl-certificates',
+    name: 'SslCertificate',
+    component: () => import('../views/SslCertificate.vue')
+  },
+  {
     path: '/ai-chat',
     name: 'AiChat',
     component: () => import('../views/AiChat.vue')
