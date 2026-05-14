@@ -12,8 +12,13 @@ public class NginxClientAutoConfiguration {
 
     private static final Long CONFIG_ID = 1L;
 
+    private static NginxClient nginxClientInstance;
+
     @Bean
     public NginxClient nginxClient(PathConfigRepository repository) {
+        if (nginxClientInstance != null) {
+            return nginxClientInstance;
+        }
         NginxClient client = new NginxClient();
 
         PathConfig config = repository.findById(CONFIG_ID).orElse(null);
@@ -28,7 +33,14 @@ public class NginxClientAutoConfiguration {
         } catch (NginxException e) {
             log.warn("NginxClient 初始化失败（路径无效），等待用户修正: {}", e.getMessage());
         }
-
+        nginxClientInstance = client;
         return client;
+    }
+
+    public static NginxClient getNginxClient() {
+        if (nginxClientInstance == null) {
+            throw new IllegalStateException("NginxClient 尚未初始化，请先通过 Spring 注入获取实例");
+        }
+        return nginxClientInstance;
     }
 }

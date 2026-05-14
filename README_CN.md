@@ -40,6 +40,7 @@
 
 <p align="center">
   <img src="./doc/example.gif" alt="Nginx GUI 2 演示" width="90%" />
+  <img src="./doc/AI.gif" alt="Nginx GUI 2 演示" width="90%" />
 </p>
 
 ## 为什么选择 Nginx GUI 2？

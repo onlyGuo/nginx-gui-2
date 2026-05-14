@@ -28,6 +28,11 @@ const routes = [
     component: () => import('../views/NginxConfig.vue')
   },
   {
+    path: '/ai-chat',
+    name: 'AiChat',
+    component: () => import('../views/AiChat.vue')
+  },
+  {
     path: '/firewall',
     name: 'Firewall',
     component: () => import('../views/Firewall.vue')
