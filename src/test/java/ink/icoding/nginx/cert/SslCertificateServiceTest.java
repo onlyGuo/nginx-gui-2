@@ -9,7 +9,7 @@ class SslCertificateServiceTest {
 
     @Test
     void acmeStatusUsesNativeClientWithoutAcmeSh() {
-        SslCertificateService service = new SslCertificateService(null, null, null);
+        SslCertificateService service = new SslCertificateService(null, null, null, null, null);
         var status = service.acmeStatus();
         assertEquals(true, status.get("installed"));
         assertEquals("native-acme4j", status.get("path"));

@@ -23,6 +23,8 @@ public class SslCertificateService {
     private final SslCertificateRepository repository;
     private final NativeAcmeClient nativeAcmeClient;
     private final TencentDnsChallengeService tencentDnsChallengeService;
+    private final AliyunDnsChallengeService aliyunDnsChallengeService;
+    private final CloudflareDnsChallengeService cloudflareDnsChallengeService;
 
     @Transactional
     public SslCertificate issue(SslCertificateRequest request) {
@@ -96,7 +98,8 @@ public class SslCertificateService {
         DnsProvider provider = DnsProvider.of(certificate.getDnsProvider());
         DnsChallengeService dnsService = switch (provider) {
             case TENCENT -> tencentDnsChallengeService;
-            default -> throw new BadRequestException("内置 ACME 暂只支持腾讯云 DNS");
+            case ALIYUN -> aliyunDnsChallengeService;
+            case CLOUDFLARE -> cloudflareDnsChallengeService;
         };
         SslCertificateIssueResult result = nativeAcmeClient.issue(certificate, dnsService);
         saveToTarget(certificate.getStoragePath(), result.getCertPem(), result.getPrivateKeyPem(), result.getFullchainPem(), result.getFullchainPem());
