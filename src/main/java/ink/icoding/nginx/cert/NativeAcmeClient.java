@@ -15,7 +15,12 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Hashtable;
 import java.util.List;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
 
 @Component
 public class NativeAcmeClient {
@@ -82,9 +87,9 @@ public class NativeAcmeClient {
         Dns01Challenge challenge = authorization.findChallenge(Dns01Challenge.class)
                 .orElseThrow(() -> new BadRequestException("CA 未返回 DNS-01 验证挑战"));
         String rrName = Dns01Challenge.toRRName(authorization.getIdentifier());
-        Long recordId = dnsService.createTxtRecord(certificate, rrName, challenge.getDigest());
+        String recordId = dnsService.createTxtRecord(certificate, rrName, challenge.getDigest());
         try {
-            Thread.sleep(20_000L);
+            waitForDnsPropagation(rrName, challenge.getDigest());
             challenge.trigger();
             Status status = challenge.waitForCompletion(CHALLENGE_TIMEOUT);
             if (status != Status.VALID) {
@@ -112,5 +117,47 @@ public class NativeAcmeClient {
                 .map(String::trim)
                 .filter(domain -> !domain.isBlank())
                 .toList();
+    }
+
+    /**
+     * Polls DNS for the _acme-challenge TXT record to verify propagation.
+     * Minimum wait 20s, poll interval 5s, max timeout 60s after initial wait.
+     */
+    private void waitForDnsPropagation(String rrName, String expectedValue) throws InterruptedException {
+        long timeoutMs = 60_000L;
+        Thread.sleep(20_000L);
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (checkTxtRecord(rrName, expectedValue)) {
+                return;
+            }
+            Thread.sleep(5_000L);
+        }
+    }
+
+    private boolean checkTxtRecord(String rrName, String expectedValue) {
+        try {
+            String normalized = rrName.endsWith(".") ? rrName : rrName + ".";
+            Hashtable<String, String> env = new Hashtable<>();
+            env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
+            env.put("java.naming.provider.url", "dns://8.8.8.8");
+            DirContext ctx = new InitialDirContext(env);
+            try {
+                Attributes attrs = ctx.getAttributes(normalized, new String[]{"TXT"});
+                Attribute txtAttr = attrs.get("TXT");
+                if (txtAttr != null) {
+                    for (int i = 0; i < txtAttr.size(); i++) {
+                        String txtValue = txtAttr.get(i).toString().replace("\"", "").trim();
+                        if (txtValue.equals(expectedValue)) {
+                            return true;
+                        }
+                    }
+                }
+            } finally {
+                ctx.close();
+            }
+        } catch (javax.naming.NamingException ignored) {
+        }
+        return false;
     }
 }
